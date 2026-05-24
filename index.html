@@ -432,7 +432,7 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 <div class="page" id="page-meetings">
   <div class="ph">
     <span class="ph-title">모임 기록</span>
-    <button class="add-btn" onclick="openModal('m-modal')">모임 추가</button>
+    <button class="add-btn" onclick="openNewMeeting()">모임 추가</button>
   </div>
   <div class="filters">
     <button class="fb on" onclick="mf('전체',this)">전체</button>
@@ -464,14 +464,16 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <button class="fb" onclick="bf('대여가능',this)">대여 가능</button>
     <button class="fb" onclick="bf('기부',this)">기부 도서</button>
     <button class="fb" onclick="bf('대여중',this)">대여 중</button>
+    <button class="fb" onclick="bf('소장중',this)">소장 중</button>
   </div>
   <div class="book-grid" id="book-grid"><div class="loading" style="grid-column:1/-1">불러오는 중...</div></div>
 </div>
 
-<!-- MODAL: MEETING -->
+<!-- MODAL: MEETING (등록/수정 공용) -->
 <div class="modal-bg" id="m-modal">
   <div class="modal">
-    <h2>모임 기록 추가</h2>
+    <h2 id="m-modal-title">모임 기록 추가</h2>
+    <input type="hidden" id="mt-id">
     <div class="fg"><label>모임 이름</label><input id="mt-title" placeholder="예) 6월 정기 모임"></div>
     <div class="two-col">
       <div class="fg"><label>날짜</label><input type="date" id="mt-date"></div>
@@ -487,10 +489,23 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <div class="fg"><label>지정 도서 <span class="opt-note">(선택)</span></label><input id="mt-book" placeholder="책 제목"></div>
     <div class="fg"><label>참석자 <span class="opt-note">(쉼표로 구분)</span></label><input id="mt-att" placeholder="김민지, 이서윤, 박지훈"></div>
     <div class="fg"><label>모임 이야기 <span class="opt-note">(선택)</span></label><textarea id="mt-memo" placeholder="오늘 모임에서 나눈 이야기를 자유롭게 적어주세요"></textarea></div>
+    <div class="fg">
+      <label>모임 사진 <span class="opt-note">(선택 — URL 입력 또는 파일 업로드)</span></label>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div id="mt-photo-preview" style="width:72px;height:54px;border-radius:6px;background:var(--bg2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);border:1px dashed var(--border)">사진</div>
+        <div style="flex:1">
+          <input id="mt-photo-url" placeholder="이미지 URL 입력" style="margin-bottom:6px" oninput="updateMtPhotoPreview(this.value)">
+          <label style="display:inline-block;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;color:var(--text2)">
+            📁 파일 업로드
+            <input type="file" id="mt-photo-file" accept="image/*" style="display:none" onchange="handleMtPhotoFile(this)">
+          </label>
+        </div>
+      </div>
+    </div>
     <div class="fg"><label>작성자 이름</label><input id="mt-author" placeholder="이름"></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('m-modal')">취소</button>
-      <button class="btn-save" onclick="saveMeeting()">저장</button>
+      <button class="btn-save" id="m-modal-btn" onclick="saveMeeting()">저장</button>
     </div>
   </div>
 </div>
@@ -644,12 +659,17 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 <!-- MODAL: MEETING DETAIL -->
 <div class="modal-bg" id="mt-detail-modal">
   <div class="mt-detail-modal">
+    <div id="mtd-photo-wrap" style="margin-bottom:16px"></div>
     <div class="mt-detail-header">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
         <div class="mt-detail-title" id="mtd-title"></div>
         <span class="badge" id="mtd-badge" style="flex-shrink:0;margin-left:10px;margin-top:4px"></span>
       </div>
       <div class="mt-detail-meta" id="mtd-meta"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button class="btn-edit" id="mtd-edit-btn">수정</button>
+        <button class="btn-delete" id="mtd-delete-btn">삭제</button>
+      </div>
     </div>
     <div id="mtd-book-wrap"></div>
     <div id="mtd-memo-wrap"></div>
@@ -658,6 +678,18 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
       <div class="chips" id="mtd-attendees"></div>
     </div>
     <div id="mtd-comments"></div>
+  </div>
+</div>
+
+<!-- MODAL: MEETING DELETE CONFIRM -->
+<div class="modal-bg" id="mt-confirm-modal">
+  <div class="modal" style="max-width:360px">
+    <h2>정말 삭제할까요?</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">삭제한 모임 기록은 복구할 수 없어요.</p>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('mt-confirm-modal')">취소</button>
+      <button style="padding:8px 18px;border-radius:8px;border:none;background:#C0392B;color:#fff;cursor:pointer;font-size:13px;font-family:var(--font-sans);font-weight:500" onclick="confirmDeleteMeeting()">삭제</button>
+    </div>
   </div>
 </div>
 
@@ -790,6 +822,24 @@ const MT_COLORS = [
   ['#F5EAF0','#8C3060'],['#EEF0FB','#3A4EA0'],['#EAF3DE','#3B6D11'],
   ['#FDF4E3','#8B6914'],['#F0EBF8','#6A3A9A']
 ];
+let deletingMeetingId = null;
+
+function updateMtPhotoPreview(url) {
+  const p = document.getElementById('mt-photo-preview');
+  if (!p) return;
+  p.innerHTML = url ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='사진'">` : '사진';
+}
+
+function handleMtPhotoFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('mt-photo-url').value = e.target.result;
+    updateMtPhotoPreview(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
 
 async function loadMeetings() {
   const el = document.getElementById('meeting-list');
@@ -799,19 +849,18 @@ async function loadMeetings() {
   const { data, error } = await q;
   if (error || !data?.length) { el.innerHTML = '<div class="empty">아직 모임 기록이 없어요</div>'; return; }
 
-  const badgeMap = { '지정도서': '#2D7A5F', '자유독서': '#3058A0', '번개': '#9A6010' };
-
   el.innerHTML = `<div class="mt-grid">${data.map((m, i) => {
     const [bg, fg] = MT_COLORS[i % MT_COLORS.length];
     const att = m.attendees || [];
+    const thumbInner = m.photo_url
+      ? `<img src="${m.photo_url}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'">`
+      : `<div class="mt-thumb-inner" style="background:${bg}">
+           <div style="font-size:22px">${m.type==='번개'?'⚡':m.type==='자유독서'?'📚':'📖'}</div>
+           <div class="mt-thumb-title" style="color:${fg}">${m.title}</div>
+           <div class="mt-thumb-date" style="color:${fg}">${fmtDate(m.date)}</div>
+         </div>`;
     return `<div class="mt-card" onclick='openMeetingDetail(${JSON.stringify(m).replace(/'/g,"&#39;")})'>
-      <div class="mt-thumb">
-        <div class="mt-thumb-inner" style="background:${bg}">
-          <div style="font-size:22px">${m.type==='번개'?'⚡':m.type==='자유독서'?'📚':'📖'}</div>
-          <div class="mt-thumb-title" style="color:${fg}">${m.title}</div>
-          <div class="mt-thumb-date" style="color:${fg}">${fmtDate(m.date)}</div>
-        </div>
-      </div>
+      <div class="mt-thumb">${thumbInner}</div>
       <div class="mt-card-label">${m.title}</div>
       <div class="mt-card-sub">${m.place||''} · ${att.length}명</div>
     </div>`;
@@ -821,6 +870,12 @@ async function loadMeetings() {
 function openMeetingDetail(m) {
   const att = m.attendees || [];
   const badgeClass = { '지정도서': 'b-green', '자유독서': 'b-blue', '번개': 'b-amber' }[m.type] || 'b-gray';
+
+  const photoWrap = document.getElementById('mtd-photo-wrap');
+  photoWrap.innerHTML = m.photo_url
+    ? `<img src="${m.photo_url}" style="width:100%;border-radius:10px;object-fit:cover;max-height:220px;display:block" onerror="this.style.display='none'">`
+    : '';
+
   document.getElementById('mtd-title').textContent = m.title;
   const badge = document.getElementById('mtd-badge');
   badge.textContent = m.type; badge.className = `badge ${badgeClass}`;
@@ -833,8 +888,40 @@ function openMeetingDetail(m) {
   document.getElementById('mtd-memo-wrap').innerHTML = m.memo
     ? `<div class="mt-detail-memo">${m.memo}</div>` : '';
   document.getElementById('mtd-attendees').innerHTML = att.map(a => `<span class="chip">${a}</span>`).join('');
+
+  document.getElementById('mtd-edit-btn').onclick = () => { closeModal('mt-detail-modal'); openEditMeeting(m); };
+  document.getElementById('mtd-delete-btn').onclick = () => { deletingMeetingId = m.id; openModal('mt-confirm-modal'); };
+
   openModal('mt-detail-modal');
   loadComments('meeting', m.id, 'mtd-comments');
+}
+
+function openEditMeeting(m) {
+  document.getElementById('m-modal-title').textContent = '모임 수정';
+  document.getElementById('m-modal-btn').textContent = '수정 저장';
+  document.getElementById('mt-id').value = m.id;
+  document.getElementById('mt-title').value = m.title || '';
+  document.getElementById('mt-date').value = m.date || '';
+  document.getElementById('mt-place').value = m.place || '';
+  document.getElementById('mt-book').value = m.book || '';
+  document.getElementById('mt-att').value = (m.attendees || []).join(', ');
+  document.getElementById('mt-memo').value = m.memo || '';
+  document.getElementById('mt-author').value = m.author_name || '';
+  document.getElementById('mt-photo-url').value = m.photo_url || '';
+  updateMtPhotoPreview(m.photo_url || '');
+  const sel = document.getElementById('mt-type');
+  for (let opt of sel.options) { if (opt.value === m.type) { opt.selected = true; break; } }
+  openModal('m-modal');
+}
+
+function openNewMeeting() {
+  document.getElementById('m-modal-title').textContent = '모임 기록 추가';
+  document.getElementById('m-modal-btn').textContent = '저장';
+  document.getElementById('mt-id').value = '';
+  ['mt-title','mt-date','mt-place','mt-book','mt-att','mt-memo','mt-author','mt-photo-url'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('mt-type').selectedIndex = 0;
+  updateMtPhotoPreview('');
+  openModal('m-modal');
 }
 
 function mf(f, btn) {
@@ -848,7 +935,7 @@ async function saveMeeting() {
   const title = document.getElementById('mt-title').value.trim();
   if (!title) { toast('모임 이름을 입력해주세요'); return; }
   const att = document.getElementById('mt-att').value.split(',').map(s => s.trim()).filter(Boolean);
-  const { error } = await sb.from('meetings').insert({
+  const payload = {
     title, date: document.getElementById('mt-date').value || new Date().toISOString().slice(0,10),
     type: document.getElementById('mt-type').value,
     place: document.getElementById('mt-place').value.trim(),
@@ -856,11 +943,29 @@ async function saveMeeting() {
     attendees: att,
     memo: document.getElementById('mt-memo').value.trim(),
     author_name: document.getElementById('mt-author').value.trim(),
-  });
+    photo_url: document.getElementById('mt-photo-url').value.trim() || null,
+  };
+  const editId = document.getElementById('mt-id').value;
+  let error;
+  if (editId) {
+    ({ error } = await sb.from('meetings').update(payload).eq('id', editId));
+  } else {
+    ({ error } = await sb.from('meetings').insert(payload));
+  }
   if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
-  ['mt-title','mt-date','mt-place','mt-book','mt-att','mt-memo','mt-author'].forEach(id => document.getElementById(id).value = '');
   closeModal('m-modal');
-  toast('모임이 등록됐어요 🎉');
+  toast(editId ? '모임이 수정됐어요 ✏️' : '모임이 등록됐어요 🎉');
+  loadMeetings();
+}
+
+async function confirmDeleteMeeting() {
+  if (!deletingMeetingId) return;
+  const { error } = await sb.from('meetings').delete().eq('id', deletingMeetingId);
+  if (error) { toast('삭제 중 오류가 발생했어요'); return; }
+  closeModal('mt-confirm-modal');
+  closeModal('mt-detail-modal');
+  toast('모임 기록이 삭제됐어요');
+  deletingMeetingId = null;
   loadMeetings();
 }
 
@@ -1102,8 +1207,9 @@ async function loadBooks() {
   const filtered = data.filter(b => {
     if (bFilter === '전체') return true;
     if (bFilter === '대여가능') return b.type === '대여' && b.status === '가능';
-    if (bFilter === '기부') return b.type === '기부';
+    if (bFilter === '기부') return b.type === '기부' && b.status !== '소장중';
     if (bFilter === '대여중') return b.status === '대여중';
+    if (bFilter === '소장중') return b.status === '소장중';
     return true;
   });
 
@@ -1112,22 +1218,22 @@ async function loadBooks() {
   el.innerHTML = filtered.map((b, i) => {
     const ci2 = i % BC.length;
     const isRent = b.type === '대여', isGift = b.type === '기부';
-    const avail = b.status === '가능', rented = b.status === '대여중';
+    const avail = b.status === '가능', rented = b.status === '대여중', owned = b.status === '소장중';
     const st = isRent
       ? (avail ? '<span class="badge b-green">대여 가능</span>' : '<span class="badge b-gray">대여 중</span>')
-      : '<span class="badge b-blue">기부</span>';
+      : (owned ? '<span class="badge b-amber">소장 중</span>' : '<span class="badge b-blue">기부</span>');
     return `<div class="bk">
       <div class="bk-spine" style="background:${BC[ci2]};color:${BT[ci2]}">${b.title.slice(0,6)}</div>
       <div class="bk-title">${b.title}</div>
       <div class="bk-author">${b.book_author || ''}</div>
       ${st}
       ${b.description ? `<div class="bk-desc">${b.description}</div>` : ''}
-      <div class="bk-owner">등록: ${b.owner_name}${rented && b.borrower_name ? ` · 대여자: ${b.borrower_name}` : ''}</div>
+      <div class="bk-owner">등록: ${b.owner_name}${(rented||owned) && b.borrower_name ? ` · ${owned?'소장':'대여자'}: ${b.borrower_name}` : ''}</div>
       <div class="bk-actions">
         ${isRent && avail ? `<button class="btn-s btn-green" onclick="startBorrow('${b.id}')">대여 신청</button>` : ''}
         ${isRent && rented ? `<button class="btn-s" onclick="returnBook('${b.id}')">반납</button>` : ''}
         ${isGift && avail ? `<button class="btn-s btn-gift" onclick="startGift('${b.id}')">받아가기</button>` : ''}
-        ${isGift && !avail ? `<span style="font-size:12px;color:var(--text3)">신청 완료</span>` : ''}
+        ${isGift && owned ? `<span style="font-size:12px;color:var(--text3)">${b.borrower_name||''}이 소장 중</span>` : ''}
       </div>
     </div>`;
   }).join('');
@@ -1167,7 +1273,7 @@ async function confirmBorrow() {
   const name = document.getElementById('borrow-name').value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
   const { error } = await sb.from('books').update({ status: '대여중', borrower_name: name }).eq('id', borrowingId);
-  if (error) { toast('오류가 발생했어요'); return; }
+  if (error) { toast('오류가 발생했어요'); console.error(error); return; }
   closeModal('borrow-modal');
   toast('대여 신청됐어요 📖');
   loadBooks();
@@ -1182,10 +1288,11 @@ function startGift(id) {
 async function confirmGift() {
   const name = document.getElementById('gift-name').value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
-  const { error } = await sb.from('books').update({ status: '신청완료', borrower_name: name }).eq('id', giftingId);
-  if (error) { toast('오류가 발생했어요'); return; }
+  const { error } = await sb.from('books').update({ status: '소장중', borrower_name: name }).eq('id', giftingId);
+  if (error) { toast('오류가 발생했어요'); console.error(error); return; }
   closeModal('gift-modal');
   toast('신청됐어요! 등록자에게 연락해 주세요 🎁');
+  giftingId = null;
   loadBooks();
 }
 
