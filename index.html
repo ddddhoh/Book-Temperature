@@ -406,6 +406,61 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 /* GIFT REQUEST */
 .btn-gift { background: #FBF0E0; color: #9A6010; border-color: #F5D9A0; }
 .btn-gift:hover { background: #F5D9A0; }
+/* MINI CALENDAR (홈 위젯) */
+.mini-cal-wrap {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:16px 18px;
+  box-shadow:var(--shadow); margin-top:16px;
+}
+.mini-cal-header {
+  display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;
+}
+.mini-cal-title { font-size:14px; font-weight:500; }
+.mini-cal-nav { display:flex; align-items:center; gap:6px; }
+.mini-cal-nav button {
+  background:none; border:none; cursor:pointer; font-size:15px;
+  color:var(--text2); padding:2px 6px; border-radius:4px; line-height:1;
+  transition:background 0.12s;
+}
+.mini-cal-nav button:hover { background:var(--bg2); }
+.mini-cal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr); gap:2px;
+}
+.mini-dow {
+  text-align:center; font-size:10px; font-weight:500;
+  color:var(--text3); padding:2px 0 6px;
+}
+.mini-dow:first-child { color:#C0392B; }
+.mini-dow:last-child  { color:#3058A0; }
+.mini-day {
+  text-align:center; font-size:12px; padding:4px 2px;
+  border-radius:6px; cursor:pointer; transition:background 0.1s;
+  position:relative; line-height:1.4;
+}
+.mini-day:hover { background:var(--bg2); }
+.mini-day.other  { color:var(--text3); }
+.mini-day.today  { background:var(--green); color:#fff; font-weight:500; border-radius:50%; }
+.mini-day.sunday { color:#C0392B; }
+.mini-day.saturday { color:#3058A0; }
+.mini-day.today.sunday, .mini-day.today.saturday { color:#fff; }
+.mini-day .ev-dots {
+  display:flex; justify-content:center; gap:2px; margin-top:2px;
+}
+.mini-day .ev-dot-sm {
+  width:4px; height:4px; border-radius:50%;
+}
+.mini-ev-list {
+  margin-top:12px; border-top:1px solid var(--bg2); padding-top:10px;
+}
+.mini-ev-item {
+  display:flex; gap:7px; align-items:flex-start;
+  font-size:12px; padding:4px 0; border-bottom:1px solid var(--bg2);
+}
+.mini-ev-item:last-child { border-bottom:none; }
+.mini-ev-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; margin-top:3px; }
+.mini-ev-title { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
+.mini-ev-date  { font-size:11px; color:var(--text3); white-space:nowrap; }
+
 /* CALENDAR */
 .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
 .cal-nav { display:flex; align-items:center; gap:12px; }
@@ -524,6 +579,20 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
       </div>
       <div id="recent-r" style="pointer-events:none"><div class="loading">불러오는 중...</div></div>
     </div>
+  </div>
+
+  <!-- 미니 달력 -->
+  <div class="mini-cal-wrap">
+    <div class="mini-cal-header">
+      <div class="mini-cal-nav">
+        <button onclick="miniCalPrev()">‹</button>
+        <span class="mini-cal-title" id="mini-cal-label"></span>
+        <button onclick="miniCalNext()">›</button>
+      </div>
+      <button class="add-btn" style="padding:5px 12px;font-size:12px" onclick="go('calendar')">일정 관리 →</button>
+    </div>
+    <div class="mini-cal-grid" id="mini-cal-grid"></div>
+    <div class="mini-ev-list" id="mini-ev-list"></div>
   </div>
 </div>
 
@@ -1078,6 +1147,9 @@ async function loadHome() {
         </div>`;
       }).join('')
     : '<div style="font-size:13px;color:var(--text3);padding:8px 0">아직 독후감이 없어요</div>';
+
+  // 미니 달력 로드
+  loadMiniCal();
 }
 
 // ── MEETINGS ──────────────────────────────────────────
@@ -1685,6 +1757,114 @@ async function returnBook(id) {
   if (error) { toast('오류가 발생했어요'); return; }
   toast('반납 처리됐어요');
   loadBooks();
+}
+
+let miniCalYear  = new Date().getFullYear();
+let miniCalMonth = new Date().getMonth();
+let miniEventsData = [];
+
+function miniCalPrev() { miniCalMonth--; if (miniCalMonth < 0) { miniCalMonth = 11; miniCalYear--; } loadMiniCal(); }
+function miniCalNext() { miniCalMonth++; if (miniCalMonth > 11) { miniCalMonth = 0; miniCalYear++; } loadMiniCal(); }
+
+async function loadMiniCal() {
+  const firstDay = new Date(miniCalYear, miniCalMonth, 1);
+  const lastDay  = new Date(miniCalYear, miniCalMonth + 1, 0);
+  const from = firstDay.toISOString().slice(0,10);
+  const to   = lastDay.toISOString().slice(0,10);
+
+  const { data } = await sb.from('events').select('*')
+    .or(`date.gte.${from},end_date.gte.${from}`)
+    .order('date', { ascending: true });
+
+  miniEventsData = (data || []).filter(e => {
+    const s = e.date, en = e.end_date || e.date;
+    return s <= to && en >= from;
+  });
+
+  renderMiniCal();
+  renderMiniEvList(null);
+}
+
+function renderMiniCal() {
+  document.getElementById('mini-cal-label').textContent =
+    `${miniCalYear}년 ${miniCalMonth + 1}월`;
+
+  const today      = new Date().toISOString().slice(0,10);
+  const firstDow   = new Date(miniCalYear, miniCalMonth, 1).getDay();
+  const daysInMonth= new Date(miniCalYear, miniCalMonth + 1, 0).getDate();
+  const daysInPrev = new Date(miniCalYear, miniCalMonth, 0).getDate();
+  const DOW_MINI   = ['일','월','화','수','목','금','토'];
+
+  let html = DOW_MINI.map(d => `<div class="mini-dow">${d}</div>`).join('');
+
+  // 이전달 빈칸
+  for (let i = 0; i < firstDow; i++) {
+    const d = daysInPrev - firstDow + 1 + i;
+    html += `<div class="mini-day other">${d}</div>`;
+  }
+
+  // 이번달
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${miniCalYear}-${String(miniCalMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === today;
+    const dow     = new Date(miniCalYear, miniCalMonth, d).getDay();
+    const dayEvs  = miniEventsData.filter(e => {
+      const s = e.date, en = e.end_date || e.date;
+      return s <= dateStr && en >= dateStr;
+    });
+    const dots = dayEvs.slice(0,3).map(e =>
+      `<span class="ev-dot-sm" style="background:${CAT_COLOR[e.category]||'#888'}"></span>`
+    ).join('');
+    const cls = ['mini-day',
+      isToday ? 'today' : '',
+      dow===0 ? 'sunday' : dow===6 ? 'saturday' : ''
+    ].filter(Boolean).join(' ');
+
+    html += `<div class="${cls}" onclick="renderMiniEvList('${dateStr}')">
+      ${d}
+      ${dots ? `<div class="ev-dots">${dots}</div>` : ''}
+    </div>`;
+  }
+
+  // 다음달 빈칸
+  const total     = firstDow + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= remaining; d++) {
+    html += `<div class="mini-day other">${d}</div>`;
+  }
+
+  document.getElementById('mini-cal-grid').innerHTML = html;
+}
+
+function renderMiniEvList(dateStr) {
+  const el = document.getElementById('mini-ev-list');
+  let filtered;
+  if (dateStr) {
+    filtered = miniEventsData.filter(e => {
+      const s = e.date, en = e.end_date || e.date;
+      return s <= dateStr && en >= dateStr;
+    });
+  } else {
+    // 오늘 이후 가장 가까운 일정 5개
+    const today = new Date().toISOString().slice(0,10);
+    filtered = miniEventsData.filter(e => (e.end_date||e.date) >= today).slice(0,5);
+  }
+
+  if (!filtered.length) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--text3);padding:4px 0">${dateStr ? '이날 일정이 없어요' : '다가오는 일정이 없어요'}</div>`;
+    return;
+  }
+  el.innerHTML = filtered.map(e => {
+    const color = CAT_COLOR[e.category] || '#888';
+    const dateLabel = e.end_date && e.end_date !== e.date
+      ? `${e.date.slice(5).replace('-','/')} ~ ${e.end_date.slice(5).replace('-','/')}`
+      : e.date.slice(5).replace('-','/');
+    return `<div class="mini-ev-item">
+      <div class="mini-ev-dot" style="background:${color}"></div>
+      <div class="mini-ev-title">${e.title}</div>
+      <div class="mini-ev-date">${dateLabel}${e.time ? ' '+e.time : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── CALENDAR ──────────────────────────────────────────
