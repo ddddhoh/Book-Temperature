@@ -505,11 +505,10 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   margin-bottom:2px; overflow:hidden; white-space:nowrap;
   text-overflow:ellipsis; cursor:pointer;
 }
-.ev-모임 { background:#E8F2EE; color:#2D7A5F; }
-.ev-독서 { background:#E6F1FB; color:#3058A0; }
-.ev-공지 { background:#FBF0E0; color:#9A6010; }
-.ev-기타 { background:#F5EAF0; color:#8C3060; }
-.ev-일반 { background:#F1EFE8; color:#5F5E5A; }
+.ev-정기모임 { background:#E8F2EE; color:#2D7A5F; }
+.ev-자유독서 { background:#E6F1FB; color:#3058A0; }
+.ev-테마독서 { background:#FBF0E0; color:#9A6010; }
+.ev-기타     { background:#F5EAF0; color:#8C3060; }
 .cal-more { font-size:10px; color:var(--text3); padding-left:5px; }
 
 /* EVENT DETAIL SIDEBAR */
@@ -848,11 +847,10 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <div class="fg"><label>종료 날짜 <span class="opt-note">(선택 — 여러 날인 경우)</span></label><input type="date" id="ev-end-date"></div>
     <div class="fg"><label>구분</label>
       <select id="ev-category">
-        <option value="모임">모임</option>
-        <option value="독서">독서</option>
-        <option value="공지">공지</option>
+        <option value="정기모임">정기 모임</option>
+        <option value="자유독서">자유 독서</option>
+        <option value="테마독서">테마 독서</option>
         <option value="기타">기타</option>
-        <option value="일반">일반</option>
       </select>
     </div>
     <div class="fg"><label>메모 <span class="opt-note">(선택)</span></label><textarea id="ev-desc" placeholder="일정에 대한 메모를 남겨주세요"></textarea></div>
@@ -1872,7 +1870,7 @@ let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-indexed
 let eventsData = [];
 let deletingEventId = null;
-const CAT_COLOR = { '모임':'#2D7A5F', '독서':'#3058A0', '공지':'#9A6010', '기타':'#8C3060', '일반':'#888' };
+const CAT_COLOR = { '정기모임':'#2D7A5F', '자유독서':'#3058A0', '테마독서':'#9A6010', '기타':'#8C3060' };
 const DOW = ['일','월','화','수','목','금','토'];
 
 function calPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } loadCalendar(); }
@@ -2006,7 +2004,7 @@ function openNewEvent() {
   ['ev-title','ev-time','ev-desc'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('ev-date').value = new Date().toISOString().slice(0,10);
   document.getElementById('ev-end-date').value = '';
-  document.getElementById('ev-category').value = '일반';
+  document.getElementById('ev-category').value = '정기모임';
   openModal('ev-modal');
 }
 
