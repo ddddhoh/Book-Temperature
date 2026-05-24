@@ -417,12 +417,16 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     </div>
   </div>
   <div class="home-recent">
-    <div class="recent-box">
-      <div class="recent-title">최근 모임</div>
+    <div class="recent-box" style="cursor:pointer" onclick="go('meetings')">
+      <div class="recent-title" style="display:flex;justify-content:space-between;align-items:center">
+        최근 모임 <span style="font-size:11px;color:var(--green)">더보기 →</span>
+      </div>
       <div id="recent-m"><div class="loading">불러오는 중...</div></div>
     </div>
-    <div class="recent-box">
-      <div class="recent-title">최근 독후감</div>
+    <div class="recent-box" style="cursor:pointer" onclick="go('reviews')">
+      <div class="recent-title" style="display:flex;justify-content:space-between;align-items:center">
+        최근 독후감 <span style="font-size:11px;color:var(--green)">더보기 →</span>
+      </div>
       <div id="recent-r"><div class="loading">불러오는 중...</div></div>
     </div>
   </div>
@@ -449,6 +453,11 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <span class="ph-title">독후감 아카이브</span>
     <button class="add-btn" onclick="openNewReview()">독후감 등록</button>
   </div>
+  <div style="display:flex;gap:6px;margin-bottom:10px;align-items:center">
+    <span style="font-size:12px;color:var(--text2)">필터 기준</span>
+    <button id="mode-writer" class="fb on" onclick="setFilterMode('writer',this)" style="border-radius:6px">회원별</button>
+    <button id="mode-genre" class="fb" onclick="setFilterMode('genre',this)" style="border-radius:6px">장르별</button>
+  </div>
   <div class="filters" id="review-filters"></div>
   <div id="review-list"><div class="loading">불러오는 중...</div></div>
 </div>
@@ -457,7 +466,7 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 <div class="page" id="page-books">
   <div class="ph">
     <span class="ph-title">도서 나눔 &amp; 대여</span>
-    <button class="add-btn" onclick="openModal('b-modal')">도서 등록</button>
+    <button class="add-btn" onclick="openNewBook()">도서 등록</button>
   </div>
   <div class="filters">
     <button class="fb on" onclick="bf('전체',this)">전체</button>
@@ -568,10 +577,11 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   </div>
 </div>
 
-<!-- MODAL: BOOK -->
+<!-- MODAL: BOOK (등록/수정 공용) -->
 <div class="modal-bg" id="b-modal">
   <div class="modal">
-    <h2>도서 등록</h2>
+    <h2 id="b-modal-title">도서 등록</h2>
+    <input type="hidden" id="bk-id">
     <div class="two-col">
       <div class="fg"><label>책 제목</label><input id="bk-title" placeholder="책 제목"></div>
       <div class="fg"><label>저자</label><input id="bk-author" placeholder="저자"></div>
@@ -588,7 +598,19 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <div class="fg"><label>책 소개 <span class="opt-note">(선택)</span></label><input id="bk-desc" placeholder="이런 분께 추천해요..."></div>
     <div class="modal-footer">
       <button class="btn-cancel" onclick="closeModal('b-modal')">취소</button>
-      <button class="btn-save" onclick="saveBook()">등록</button>
+      <button class="btn-save" id="b-modal-btn" onclick="saveBook()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BOOK DELETE CONFIRM -->
+<div class="modal-bg" id="bk-confirm-modal">
+  <div class="modal" style="max-width:360px">
+    <h2>정말 삭제할까요?</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">삭제한 도서는 복구할 수 없어요.</p>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('bk-confirm-modal')">취소</button>
+      <button style="padding:8px 18px;border-radius:8px;border:none;background:#C0392B;color:#fff;cursor:pointer;font-size:13px;font-family:var(--font-sans);font-weight:500" onclick="confirmDeleteBook()">삭제</button>
     </div>
   </div>
 </div>
@@ -804,15 +826,38 @@ async function loadHome() {
   document.getElementById('cnt-r').textContent = (rc || 0) + '편';
   document.getElementById('cnt-b').textContent = (bc || 0) + '권';
 
-  const { data: rm } = await sb.from('meetings').select('title,date,place').order('created_at', { ascending: false }).limit(3);
-  const { data: rr } = await sb.from('reviews').select('book,writer,created_at,type').order('created_at', { ascending: false }).limit(3);
+  const { data: rm } = await sb.from('meetings').select('title,date,place,attendees,photo_url').order('created_at', { ascending: false }).limit(3);
+  const { data: rr } = await sb.from('reviews').select('book,writer,created_at,type,cover_url').order('created_at', { ascending: false }).limit(3);
 
   document.getElementById('recent-m').innerHTML = rm?.length
-    ? rm.map(m => `<div class="mini"><div class="mini-t">${m.title}</div><div class="mini-s">${fmtDate(m.date)} · ${m.place||''}</div></div>`).join('')
+    ? rm.map(m => {
+        const att = m.attendees || [];
+        const thumb = m.photo_url
+          ? `<img src="${m.photo_url}" style="width:40px;height:40px;border-radius:6px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+          : `<div style="width:40px;height:40px;border-radius:6px;background:var(--green-light);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:16px">🗓️</div>`;
+        return `<div class="mini" style="display:flex;gap:10px;align-items:center">
+          ${thumb}
+          <div style="min-width:0">
+            <div class="mini-t">${m.title}</div>
+            <div class="mini-s">${fmtDate(m.date)}${att.length ? ' · ' + att.slice(0,3).join(', ') + (att.length>3?` 외 ${att.length-3}명`:'') : ''}</div>
+          </div>
+        </div>`;
+      }).join('')
     : '<div style="font-size:13px;color:var(--text3);padding:8px 0">아직 모임 기록이 없어요</div>';
 
   document.getElementById('recent-r').innerHTML = rr?.length
-    ? rr.map(r => `<div class="mini"><div class="mini-t">『${r.book}』 — ${r.writer}</div><div class="mini-s">${timeAgo(r.created_at)} · ${r.type}</div></div>`).join('')
+    ? rr.map(r => {
+        const thumb = r.cover_url
+          ? `<img src="${r.cover_url}" style="width:30px;height:42px;border-radius:3px;object-fit:cover;flex-shrink:0" onerror="this.style.display='none'">`
+          : `<div style="width:30px;height:42px;border-radius:3px;background:var(--green-light);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px">📖</div>`;
+        return `<div class="mini" style="display:flex;gap:10px;align-items:center">
+          ${thumb}
+          <div style="min-width:0">
+            <div class="mini-t">『${r.book}』</div>
+            <div class="mini-s">${r.writer} · ${timeAgo(r.created_at)}</div>
+          </div>
+        </div>`;
+      }).join('')
     : '<div style="font-size:13px;color:var(--text3);padding:8px 0">아직 독후감이 없어요</div>';
 }
 
@@ -1042,9 +1087,11 @@ async function loadReviews() {
     return;
   }
 
-  buildWriterFilters(data);
+  buildFilters(data);
 
-  const filtered = rFilter === '전체' ? data : data.filter(r => r.writer === rFilter);
+  const filtered = rFilter === '전체' ? data : data.filter(r =>
+    rFilterMode === 'writer' ? r.writer === rFilter : r.type === rFilter
+  );
   if (!filtered.length) {
     el.innerHTML = '<div class="empty">해당 회원의 독후감이 없어요</div>';
     return;
@@ -1074,14 +1121,36 @@ async function loadReviews() {
   });
 }
 
-function buildWriterFilters(data) {
-  const writers = ['전체', ...new Set(data.map(r => r.writer).filter(Boolean))];
+let rFilterMode = 'writer'; // 'writer' | 'genre'
+
+function setFilterMode(mode, btn) {
+  rFilterMode = mode;
+  rFilter = '전체';
+  document.querySelectorAll('#page-reviews .fb[id^="mode-"]').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  // rebuild filters with current data
+  const allCards = document.querySelectorAll('.rv-book-card');
+  // re-fetch to rebuild filters
+  loadReviews();
+}
+
+function buildFilters(data) {
   const container = document.getElementById('review-filters');
   if (!container) return;
-  container.innerHTML = writers.map(w =>
-    `<button class="fb ${w === rFilter ? 'on' : ''}" onclick="rf('${w}',this)">${w}</button>`
-  ).join('');
+  if (rFilterMode === 'writer') {
+    const writers = ['전체', ...new Set(data.map(r => r.writer).filter(Boolean))];
+    container.innerHTML = writers.map(w =>
+      `<button class="fb ${w === rFilter ? 'on' : ''}" onclick="rf('${w}',this)">${w}</button>`
+    ).join('');
+  } else {
+    const genres = ['전체', ...new Set(data.map(r => r.type).filter(Boolean))];
+    container.innerHTML = genres.map(g =>
+      `<button class="fb ${g === rFilter ? 'on' : ''}" onclick="rf('${g}',this)">${g}</button>`
+    ).join('');
+  }
 }
+
+function buildWriterFilters(data) { buildFilters(data); }
 
 function rf(f, btn) {
   rFilter = f;
@@ -1197,6 +1266,7 @@ async function confirmDelete() {
 
 // ── BOOKS ─────────────────────────────────────────────
 let giftingId = null;
+let deletingBookId = null;
 
 async function loadBooks() {
   const el = document.getElementById('book-grid');
@@ -1234,6 +1304,8 @@ async function loadBooks() {
         ${isRent && rented ? `<button class="btn-s" onclick="returnBook('${b.id}')">반납</button>` : ''}
         ${isGift && avail ? `<button class="btn-s btn-gift" onclick="startGift('${b.id}')">받아가기</button>` : ''}
         ${isGift && owned ? `<span style="font-size:12px;color:var(--text3)">${b.borrower_name||''}이 소장 중</span>` : ''}
+        <button class="btn-edit" onclick="openEditBook(${JSON.stringify(b).replace(/"/g,'&quot;')})">수정</button>
+        <button class="btn-delete" onclick="startDeleteBook('${b.id}')">삭제</button>
       </div>
     </div>`;
   }).join('');
@@ -1246,20 +1318,62 @@ function bf(f, btn) {
   loadBooks();
 }
 
+function openNewBook() {
+  document.getElementById('b-modal-title').textContent = '도서 등록';
+  document.getElementById('b-modal-btn').textContent = '등록';
+  document.getElementById('bk-id').value = '';
+  ['bk-title','bk-author','bk-owner','bk-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('bk-type').selectedIndex = 0;
+  openModal('b-modal');
+}
+
+function openEditBook(b) {
+  document.getElementById('b-modal-title').textContent = '도서 수정';
+  document.getElementById('b-modal-btn').textContent = '수정 저장';
+  document.getElementById('bk-id').value = b.id;
+  document.getElementById('bk-title').value = b.title || '';
+  document.getElementById('bk-author').value = b.book_author || '';
+  document.getElementById('bk-owner').value = b.owner_name || '';
+  document.getElementById('bk-desc').value = b.description || '';
+  const sel = document.getElementById('bk-type');
+  for (let opt of sel.options) { if (opt.value === b.type) { opt.selected = true; break; } }
+  openModal('b-modal');
+}
+
 async function saveBook() {
   const title = document.getElementById('bk-title').value.trim();
   const owner = document.getElementById('bk-owner').value.trim();
   if (!title || !owner) { toast('책 제목과 등록자를 입력해주세요'); return; }
-  const { error } = await sb.from('books').insert({
+  const payload = {
     title, book_author: document.getElementById('bk-author').value.trim(),
     owner_name: owner, type: document.getElementById('bk-type').value,
     description: document.getElementById('bk-desc').value.trim(),
-    status: '가능',
-  });
-  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
-  ['bk-title','bk-author','bk-owner','bk-desc'].forEach(id => document.getElementById(id).value = '');
+  };
+  const editId = document.getElementById('bk-id').value;
+  let error;
+  if (editId) {
+    ({ error } = await sb.from('books').update(payload).eq('id', editId));
+  } else {
+    ({ error } = await sb.from('books').insert({ ...payload, status: '가능' }));
+  }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); console.error(error); return; }
   closeModal('b-modal');
-  toast('도서가 등록됐어요 📚');
+  toast(editId ? '도서가 수정됐어요 ✏️' : '도서가 등록됐어요 📚');
+  loadBooks();
+}
+
+function startDeleteBook(id) {
+  deletingBookId = id;
+  openModal('bk-confirm-modal');
+}
+
+async function confirmDeleteBook() {
+  if (!deletingBookId) return;
+  const { error } = await sb.from('books').delete().eq('id', deletingBookId);
+  if (error) { toast('오류: ' + (error.message||JSON.stringify(error))); return; }
+  closeModal('bk-confirm-modal');
+  toast('도서가 삭제됐어요');
+  deletingBookId = null;
   loadBooks();
 }
 
