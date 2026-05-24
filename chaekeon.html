@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>책온 — 독서모임</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+KR:wght@400;600&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root {
+  --bg: #FAF8F4;
+  --bg2: #F2EFE9;
+  --bg3: #EAE6DE;
+  --text: #1E1C18;
+  --text2: #6B6760;
+  --text3: #9E9B96;
+  --green: #2D7A5F;
+  --green-light: #E8F2EE;
+  --green-mid: #B8D9CE;
+  --border: #DDD9D0;
+  --card: #FFFFFF;
+  --shadow: 0 1px 4px rgba(0,0,0,0.06), 0 4px 16px rgba(0,0,0,0.04);
+  --radius: 10px;
+  --font-serif: 'Noto Serif KR', serif;
+  --font-sans: 'Noto Sans KR', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: var(--font-sans); background: var(--bg); color: var(--text); min-height: 100vh; }
+
+/* NAV */
+.nav {
+  position: sticky; top: 0; z-index: 100;
+  background: rgba(250,248,244,0.92); backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 4px;
+  padding: 0 24px; height: 54px;
+}
+.nav-logo {
+  font-family: var(--font-serif); font-size: 18px; font-weight: 600;
+  color: var(--text); margin-right: 16px; cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+}
+.nav-logo::before { content: '📖'; font-size: 16px; }
+.nav-btn {
+  background: none; border: none; padding: 6px 14px; border-radius: 20px;
+  font-size: 13px; font-family: var(--font-sans); cursor: pointer;
+  color: var(--text2); font-weight: 400; transition: all 0.15s; white-space: nowrap;
+}
+.nav-btn:hover { background: var(--bg2); color: var(--text); }
+.nav-btn.active { background: var(--green); color: #fff; font-weight: 500; }
+
+/* PAGES */
+.page { display: none; max-width: 860px; margin: 0 auto; padding: 28px 20px; }
+.page.active { display: block; }
+
+/* HOME */
+.home-hero {
+  background: var(--green);
+  border-radius: 16px;
+  padding: 36px 40px;
+  margin-bottom: 24px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 24px;
+}
+.home-hero h1 {
+  font-family: var(--font-serif); font-size: 28px; font-weight: 600;
+  color: #fff; margin-bottom: 8px;
+}
+.home-hero p { font-size: 14px; color: rgba(255,255,255,0.75); line-height: 1.7; }
+.hero-deco {
+  font-size: 64px; opacity: 0.25; line-height: 1; flex-shrink: 0;
+  font-family: serif;
+}
+.home-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+.home-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 20px; cursor: pointer; transition: all 0.18s; box-shadow: var(--shadow);
+}
+.home-card:hover { border-color: var(--green-mid); transform: translateY(-1px); }
+.hc-icon { font-size: 26px; margin-bottom: 10px; }
+.hc-label { font-size: 13px; color: var(--text2); margin-bottom: 4px; }
+.hc-title { font-size: 15px; font-weight: 500; margin-bottom: 8px; }
+.hc-count { font-family: var(--font-serif); font-size: 28px; font-weight: 600; color: var(--green); }
+.home-recent { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.recent-box { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 18px; box-shadow: var(--shadow); }
+.recent-title { font-size: 13px; font-weight: 500; color: var(--text2); margin-bottom: 12px; letter-spacing: 0.03em; text-transform: uppercase; font-size: 11px; }
+.mini { padding: 8px 0; border-bottom: 1px solid var(--bg2); }
+.mini:last-child { border-bottom: none; padding-bottom: 0; }
+.mini-t { font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 2px; }
+.mini-s { font-size: 11px; color: var(--text3); }
+
+/* PAGE HEADER */
+.ph { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+.ph-title { font-family: var(--font-serif); font-size: 20px; font-weight: 600; }
+.add-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 8px 16px; border-radius: 20px;
+  background: var(--green); color: #fff; border: none;
+  font-size: 13px; font-family: var(--font-sans); font-weight: 500;
+  cursor: pointer; transition: background 0.15s;
+}
+.add-btn:hover { background: #235f4a; }
+.add-btn::before { content: '+'; font-size: 16px; line-height: 1; }
+
+/* FILTERS */
+.filters { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; }
+.fb {
+  background: none; border: 1px solid var(--border); border-radius: 20px;
+  padding: 5px 13px; font-size: 12px; font-family: var(--font-sans);
+  cursor: pointer; color: var(--text2); transition: all 0.15s;
+}
+.fb.on, .fb:hover { background: var(--green-light); color: var(--green); border-color: var(--green-mid); }
+
+/* BADGES */
+.badge {
+  display: inline-block; padding: 2px 9px; border-radius: 10px;
+  font-size: 11px; font-weight: 500;
+}
+.b-green { background: var(--green-light); color: var(--green); }
+.b-blue { background: #E8EEF8; color: #3058A0; }
+.b-amber { background: #FBF0E0; color: #9A6010; }
+.b-gray { background: var(--bg2); color: var(--text2); }
+
+/* CARDS */
+.card {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px 22px;
+  margin-bottom: 12px; box-shadow: var(--shadow);
+}
+.card-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; gap: 12px; }
+.card-title { font-size: 15px; font-weight: 500; margin-bottom: 5px; }
+.card-meta { display: flex; gap: 12px; font-size: 12px; color: var(--text2); flex-wrap: wrap; margin-bottom: 10px; }
+.card-meta span { display: flex; align-items: center; gap: 3px; }
+.card-memo {
+  font-size: 13px; color: var(--text2); line-height: 1.7;
+  background: var(--bg); border-radius: 6px; padding: 10px 12px; margin-bottom: 10px;
+}
+.chips { display: flex; gap: 5px; flex-wrap: wrap; }
+.chip { background: var(--bg2); border-radius: 8px; padding: 3px 10px; font-size: 12px; color: var(--text2); }
+
+/* REVIEW CARD */
+.rv-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.avatar {
+  width: 36px; height: 36px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 500; flex-shrink: 0;
+}
+.rv-book { font-size: 13px; color: var(--green); font-weight: 500; margin-bottom: 8px; }
+.rv-oneliner {
+  font-size: 13px; color: var(--text2); font-style: italic;
+  border-left: 2px solid var(--green-mid); padding-left: 10px; margin-bottom: 10px;
+  line-height: 1.6;
+}
+.rv-title { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+.rv-body { font-size: 13px; color: var(--text2); line-height: 1.8; }
+
+/* BOOK CARD */
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 12px; }
+.bk {
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+}
+.bk-spine {
+  width: 46px; height: 64px; border-radius: 4px; margin-bottom: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 500; text-align: center; line-height: 1.3;
+  writing-mode: vertical-rl;
+}
+.bk-title { font-size: 14px; font-weight: 500; margin-bottom: 3px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bk-author { font-size: 12px; color: var(--text3); margin-bottom: 8px; }
+.bk-owner { font-size: 11px; color: var(--text3); margin-top: 6px; }
+.bk-desc { font-size: 12px; color: var(--text2); margin-top: 5px; line-height: 1.5; }
+.bk-actions { margin-top: 10px; display: flex; gap: 6px; }
+.btn-s {
+  padding: 5px 12px; border-radius: 8px; font-size: 12px; font-family: var(--font-sans);
+  border: 1px solid var(--border); background: none; cursor: pointer;
+  color: var(--text); transition: all 0.15s;
+}
+.btn-s:hover { background: var(--bg2); }
+.btn-green { background: var(--green); color: #fff; border-color: var(--green); }
+.btn-green:hover { background: #235f4a; }
+
+/* COMMENTS */
+.comments-section { margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--bg2); }
+.comments-title { font-size: 12px; color: var(--text3); margin-bottom: 10px; letter-spacing: 0.03em; }
+.comment { display: flex; gap: 8px; margin-bottom: 10px; }
+.comment-body { flex: 1; }
+.comment-author { font-size: 12px; font-weight: 500; margin-bottom: 2px; }
+.comment-text { font-size: 13px; color: var(--text2); line-height: 1.6; }
+.comment-time { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.comment-form { display: flex; gap: 8px; margin-top: 10px; }
+.comment-input {
+  flex: 1; padding: 7px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 13px; font-family: var(--font-sans); color: var(--text);
+  outline: none; transition: border 0.15s;
+}
+.comment-input:focus { border-color: var(--green-mid); }
+.comment-name {
+  width: 90px; padding: 7px 10px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 13px; font-family: var(--font-sans); color: var(--text); outline: none;
+}
+.comment-submit {
+  padding: 7px 14px; border-radius: 8px; background: var(--green);
+  color: #fff; border: none; font-size: 13px; font-family: var(--font-sans);
+  cursor: pointer; white-space: nowrap; transition: background 0.15s;
+}
+.comment-submit:hover { background: #235f4a; }
+
+/* MODAL */
+.modal-bg {
+  display: none; position: fixed; inset: 0;
+  background: rgba(0,0,0,0.35); z-index: 200;
+  align-items: center; justify-content: center;
+  backdrop-filter: blur(2px);
+}
+.modal-bg.open { display: flex; }
+.modal {
+  background: var(--card); border-radius: 14px;
+  padding: 24px 26px; width: 500px; max-width: 95vw;
+  max-height: 90vh; overflow-y: auto;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.15);
+  animation: slideUp 0.2s ease;
+}
+@keyframes slideUp { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+.modal h2 { font-family: var(--font-serif); font-size: 17px; font-weight: 600; margin-bottom: 18px; }
+.fg { margin-bottom: 12px; }
+.fg label { display: block; font-size: 12px; color: var(--text2); margin-bottom: 4px; font-weight: 500; }
+.fg input, .fg select, .fg textarea {
+  width: 100%; padding: 9px 11px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg);
+  font-size: 13px; font-family: var(--font-sans); color: var(--text);
+  outline: none; transition: border 0.15s;
+}
+.fg input:focus, .fg select:focus, .fg textarea:focus { border-color: var(--green-mid); }
+.fg textarea { min-height: 80px; resize: vertical; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.modal-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px; }
+.btn-cancel {
+  padding: 8px 16px; border-radius: 8px; border: 1px solid var(--border);
+  background: none; cursor: pointer; font-size: 13px; font-family: var(--font-sans); color: var(--text2);
+}
+.btn-save {
+  padding: 8px 18px; border-radius: 8px; border: none;
+  background: var(--green); color: #fff; cursor: pointer;
+  font-size: 13px; font-family: var(--font-sans); font-weight: 500;
+  transition: background 0.15s;
+}
+.btn-save:hover { background: #235f4a; }
+.opt-note { font-size: 11px; color: var(--text3); margin-left: 4px; font-weight: 400; }
+.divider { height: 1px; background: var(--bg2); margin: 14px 0; }
+
+/* TOAST */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: var(--text); color: #fff; padding: 10px 20px;
+  border-radius: 20px; font-size: 13px; z-index: 999;
+  opacity: 0; pointer-events: none; transition: opacity 0.3s;
+  white-space: nowrap;
+}
+.toast.show { opacity: 1; }
+
+/* EMPTY */
+.empty { text-align: center; padding: 48px 20px; color: var(--text3); font-size: 14px; }
+.empty::before { content: '📭'; font-size: 32px; display: block; margin-bottom: 10px; }
+
+/* LOADING */
+.loading { text-align: center; padding: 40px; color: var(--text3); font-size: 13px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <span class="nav-logo" onclick="go('home')">책온</span>
+  <button class="nav-btn active" data-page="home" onclick="go('home')">홈</button>
+  <button class="nav-btn" data-page="meetings" onclick="go('meetings')">모임 기록</button>
+  <button class="nav-btn" data-page="reviews" onclick="go('reviews')">독후감</button>
+  <button class="nav-btn" data-page="books" onclick="go('books')">도서 나눔</button>
+</nav>
+
+<!-- HOME -->
+<div class="page active" id="page-home">
+  <div class="home-hero">
+    <div>
+      <h1>책온 독서모임</h1>
+      <p>읽고, 기록하고, 함께 성장하는 독서 커뮤니티<br>모임 기록 · 독후감 아카이브 · 도서 나눔</p>
+    </div>
+    <div class="hero-deco">冊</div>
+  </div>
+  <div class="home-grid">
+    <div class="home-card" onclick="go('meetings')">
+      <div class="hc-icon">🗓️</div>
+      <div class="hc-label">오프라인 모임</div>
+      <div class="hc-title">모임 기록</div>
+      <div class="hc-count" id="cnt-m">—</div>
+    </div>
+    <div class="home-card" onclick="go('reviews')">
+      <div class="hc-icon">✍️</div>
+      <div class="hc-label">독후감 아카이브</div>
+      <div class="hc-title">독후감</div>
+      <div class="hc-count" id="cnt-r">—</div>
+    </div>
+    <div class="home-card" onclick="go('books')">
+      <div class="hc-icon">📦</div>
+      <div class="hc-label">대여 · 기부</div>
+      <div class="hc-title">도서 나눔</div>
+      <div class="hc-count" id="cnt-b">—</div>
+    </div>
+  </div>
+  <div class="home-recent">
+    <div class="recent-box">
+      <div class="recent-title">최근 모임</div>
+      <div id="recent-m"><div class="loading">불러오는 중...</div></div>
+    </div>
+    <div class="recent-box">
+      <div class="recent-title">최근 독후감</div>
+      <div id="recent-r"><div class="loading">불러오는 중...</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- MEETINGS -->
+<div class="page" id="page-meetings">
+  <div class="ph">
+    <span class="ph-title">모임 기록</span>
+    <button class="add-btn" onclick="openModal('m-modal')">모임 추가</button>
+  </div>
+  <div class="filters">
+    <button class="fb on" onclick="mf('전체',this)">전체</button>
+    <button class="fb" onclick="mf('지정도서',this)">지정도서</button>
+    <button class="fb" onclick="mf('자유독서',this)">자유독서</button>
+    <button class="fb" onclick="mf('번개',this)">번개</button>
+  </div>
+  <div id="meeting-list"><div class="loading">불러오는 중...</div></div>
+</div>
+
+<!-- REVIEWS -->
+<div class="page" id="page-reviews">
+  <div class="ph">
+    <span class="ph-title">독후감 아카이브</span>
+    <button class="add-btn" onclick="openModal('r-modal')">독후감 등록</button>
+  </div>
+  <div class="filters">
+    <button class="fb on" onclick="rf('전체',this)">전체</button>
+    <button class="fb" onclick="rf('지정도서',this)">지정도서</button>
+    <button class="fb" onclick="rf('자유독서',this)">자유독서</button>
+  </div>
+  <div id="review-list"><div class="loading">불러오는 중...</div></div>
+</div>
+
+<!-- BOOKS -->
+<div class="page" id="page-books">
+  <div class="ph">
+    <span class="ph-title">도서 나눔 &amp; 대여</span>
+    <button class="add-btn" onclick="openModal('b-modal')">도서 등록</button>
+  </div>
+  <div class="filters">
+    <button class="fb on" onclick="bf('전체',this)">전체</button>
+    <button class="fb" onclick="bf('대여가능',this)">대여 가능</button>
+    <button class="fb" onclick="bf('기부',this)">기부 도서</button>
+    <button class="fb" onclick="bf('대여중',this)">대여 중</button>
+  </div>
+  <div class="book-grid" id="book-grid"><div class="loading" style="grid-column:1/-1">불러오는 중...</div></div>
+</div>
+
+<!-- MODAL: MEETING -->
+<div class="modal-bg" id="m-modal">
+  <div class="modal">
+    <h2>모임 기록 추가</h2>
+    <div class="fg"><label>모임 이름</label><input id="mt-title" placeholder="예) 6월 정기 모임"></div>
+    <div class="two-col">
+      <div class="fg"><label>날짜</label><input type="date" id="mt-date"></div>
+      <div class="fg"><label>구분</label>
+        <select id="mt-type">
+          <option value="지정도서">지정도서</option>
+          <option value="자유독서">자유독서</option>
+          <option value="번개">번개</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>장소</label><input id="mt-place" placeholder="예) 서면 북카페"></div>
+    <div class="fg"><label>지정 도서 <span class="opt-note">(선택)</span></label><input id="mt-book" placeholder="책 제목"></div>
+    <div class="fg"><label>참석자 <span class="opt-note">(쉼표로 구분)</span></label><input id="mt-att" placeholder="김민지, 이서윤, 박지훈"></div>
+    <div class="fg"><label>모임 이야기 <span class="opt-note">(선택)</span></label><textarea id="mt-memo" placeholder="오늘 모임에서 나눈 이야기를 자유롭게 적어주세요"></textarea></div>
+    <div class="fg"><label>작성자 이름</label><input id="mt-author" placeholder="이름"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('m-modal')">취소</button>
+      <button class="btn-save" onclick="saveMeeting()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: REVIEW -->
+<div class="modal-bg" id="r-modal">
+  <div class="modal">
+    <h2>독후감 등록</h2>
+    <div class="two-col">
+      <div class="fg"><label>책 제목</label><input id="rv-book" placeholder="책 제목"></div>
+      <div class="fg"><label>저자</label><input id="rv-bauthor" placeholder="저자"></div>
+    </div>
+    <div class="two-col">
+      <div class="fg"><label>작성자</label><input id="rv-writer" placeholder="이름"></div>
+      <div class="fg"><label>구분</label>
+        <select id="rv-type"><option value="지정도서">지정도서</option><option value="자유독서">자유독서</option></select>
+      </div>
+    </div>
+    <div class="fg"><label>한줄평 <span class="opt-note">(단톡방에 남긴 한줄평)</span></label><input id="rv-oneliner" placeholder="한 문장 감상"></div>
+    <div class="divider"></div>
+    <div class="fg"><label>독후감 제목 <span class="opt-note">(선택)</span></label><input id="rv-title" placeholder="독후감 제목"></div>
+    <div class="fg"><label>독후감 본문 <span class="opt-note">(단톡방에서 복사 붙여넣기)</span></label><textarea id="rv-body" style="min-height:100px" placeholder="내용을 붙여넣어 주세요"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('r-modal')">취소</button>
+      <button class="btn-save" onclick="saveReview()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BOOK -->
+<div class="modal-bg" id="b-modal">
+  <div class="modal">
+    <h2>도서 등록</h2>
+    <div class="two-col">
+      <div class="fg"><label>책 제목</label><input id="bk-title" placeholder="책 제목"></div>
+      <div class="fg"><label>저자</label><input id="bk-author" placeholder="저자"></div>
+    </div>
+    <div class="two-col">
+      <div class="fg"><label>등록자 이름</label><input id="bk-owner" placeholder="이름"></div>
+      <div class="fg"><label>등록 방식</label>
+        <select id="bk-type">
+          <option value="대여">대여 (빌려주기)</option>
+          <option value="기부">기부 (드리기)</option>
+        </select>
+      </div>
+    </div>
+    <div class="fg"><label>책 소개 <span class="opt-note">(선택)</span></label><input id="bk-desc" placeholder="이런 분께 추천해요..."></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('b-modal')">취소</button>
+      <button class="btn-save" onclick="saveBook()">등록</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: BORROW -->
+<div class="modal-bg" id="borrow-modal">
+  <div class="modal">
+    <h2>대여 신청</h2>
+    <div class="fg"><label>신청자 이름</label><input id="borrow-name" placeholder="이름"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('borrow-modal')">취소</button>
+      <button class="btn-save" onclick="confirmBorrow()">신청</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const SUPABASE_URL = 'https://pjtmzbmbvnpdtfzanahr.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBqdG16Ym1idm5wZHRmemFuYWhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk0ODA0MTMsImV4cCI6MjA5NTA1NjQxM30.wnab-LdSRY_t8WOXu_Y4JzTxGb2zprDsQuooaOyHiLQ';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+const AC = [['#E6F1FB','#185FA5'],['#E8F2EE','#2D7A5F'],['#FBF0E0','#9A6010'],['#F5EAF0','#8C3060'],['#EEF0FB','#3A4EA0']];
+const BC = ['#E8F2EE','#E6F1FB','#FBF0E0','#F5EAF0','#EEF0FB'];
+const BT = ['#2D7A5F','#3058A0','#9A6010','#8C3060','#3A4EA0'];
+
+let mFilter = '전체', rFilter = '전체', bFilter = '전체';
+let borrowingId = null;
+
+// ── NAVIGATION ──────────────────────────────────────
+function go(page) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('page-' + page).classList.add('active');
+  document.querySelector(`[data-page="${page}"]`).classList.add('active');
+  if (page === 'home') loadHome();
+  if (page === 'meetings') loadMeetings();
+  if (page === 'reviews') loadReviews();
+  if (page === 'books') loadBooks();
+}
+
+// ── TOAST ────────────────────────────────────────────
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+// ── MODAL ────────────────────────────────────────────
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-bg').forEach(m =>
+  m.addEventListener('click', e => { if (e.target === m) m.classList.remove('open'); })
+);
+
+// ── HELPERS ──────────────────────────────────────────
+function ci(name) { let h=0; for (let c of (name||'?')) h=(h*31+c.charCodeAt(0))%AC.length; return h; }
+function tbadge(t) {
+  return {'지정도서':'<span class="badge b-green">지정도서</span>',
+          '자유독서':'<span class="badge b-blue">자유독서</span>',
+          '번개':'<span class="badge b-amber">번개</span>'}[t] || '';
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d);
+  return `${dt.getFullYear()}년 ${dt.getMonth()+1}월 ${dt.getDate()}일`;
+}
+function timeAgo(d) {
+  const diff = (Date.now() - new Date(d)) / 1000;
+  if (diff < 3600) return Math.floor(diff/60) + '분 전';
+  if (diff < 86400) return Math.floor(diff/3600) + '시간 전';
+  if (diff < 604800) return Math.floor(diff/86400) + '일 전';
+  return fmtDate(d);
+}
+
+// ── COMMENTS ─────────────────────────────────────────
+async function loadComments(targetType, targetId, containerId) {
+  const { data } = await sb.from('comments')
+    .select('*').eq('target_type', targetType).eq('target_id', targetId)
+    .order('created_at', { ascending: true });
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const comments = data || [];
+  el.innerHTML = `
+    <div class="comments-section">
+      <div class="comments-title">댓글 ${comments.length}개</div>
+      ${comments.map(c => {
+        const idx = ci(c.author_name);
+        return `<div class="comment">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px;background:${AC[idx][0]};color:${AC[idx][1]}">${(c.author_name||'?')[0]}</div>
+          <div class="comment-body">
+            <div class="comment-author">${c.author_name}</div>
+            <div class="comment-text">${c.body}</div>
+            <div class="comment-time">${timeAgo(c.created_at)}</div>
+          </div>
+        </div>`;
+      }).join('')}
+      <div class="comment-form">
+        <input class="comment-name" placeholder="이름" id="cname-${containerId}">
+        <input class="comment-input" placeholder="댓글을 남겨주세요" id="cbody-${containerId}"
+          onkeydown="if(event.key==='Enter')postComment('${targetType}','${targetId}','${containerId}')">
+        <button class="comment-submit" onclick="postComment('${targetType}','${targetId}','${containerId}')">등록</button>
+      </div>
+    </div>`;
+}
+
+async function postComment(targetType, targetId, containerId) {
+  const name = document.getElementById('cname-' + containerId)?.value.trim();
+  const body = document.getElementById('cbody-' + containerId)?.value.trim();
+  if (!name || !body) { toast('이름과 댓글을 입력해주세요'); return; }
+  const { error } = await sb.from('comments').insert({ target_type: targetType, target_id: targetId, author_name: name, body });
+  if (error) { toast('오류가 발생했어요'); return; }
+  await loadComments(targetType, targetId, containerId);
+}
+
+// ── HOME ──────────────────────────────────────────────
+async function loadHome() {
+  const [{ count: mc }, { count: rc }, { count: bc }] = await Promise.all([
+    sb.from('meetings').select('*', { count: 'exact', head: true }),
+    sb.from('reviews').select('*', { count: 'exact', head: true }),
+    sb.from('books').select('*', { count: 'exact', head: true }),
+  ]);
+  document.getElementById('cnt-m').textContent = (mc || 0) + '회';
+  document.getElementById('cnt-r').textContent = (rc || 0) + '편';
+  document.getElementById('cnt-b').textContent = (bc || 0) + '권';
+
+  const { data: rm } = await sb.from('meetings').select('title,date,place').order('created_at', { ascending: false }).limit(3);
+  const { data: rr } = await sb.from('reviews').select('book,writer,created_at,type').order('created_at', { ascending: false }).limit(3);
+
+  document.getElementById('recent-m').innerHTML = rm?.length
+    ? rm.map(m => `<div class="mini"><div class="mini-t">${m.title}</div><div class="mini-s">${fmtDate(m.date)} · ${m.place||''}</div></div>`).join('')
+    : '<div style="font-size:13px;color:var(--text3);padding:8px 0">아직 모임 기록이 없어요</div>';
+
+  document.getElementById('recent-r').innerHTML = rr?.length
+    ? rr.map(r => `<div class="mini"><div class="mini-t">『${r.book}』 — ${r.writer}</div><div class="mini-s">${timeAgo(r.created_at)} · ${r.type}</div></div>`).join('')
+    : '<div style="font-size:13px;color:var(--text3);padding:8px 0">아직 독후감이 없어요</div>';
+}
+
+// ── MEETINGS ──────────────────────────────────────────
+async function loadMeetings() {
+  const el = document.getElementById('meeting-list');
+  el.innerHTML = '<div class="loading">불러오는 중...</div>';
+  let q = sb.from('meetings').select('*').order('date', { ascending: false });
+  if (mFilter !== '전체') q = q.eq('type', mFilter);
+  const { data, error } = await q;
+  if (error || !data?.length) { el.innerHTML = '<div class="empty">아직 모임 기록이 없어요</div>'; return; }
+  el.innerHTML = data.map(m => {
+    const att = m.attendees || [];
+    return `<div class="card">
+      <div class="card-top">
+        <div>
+          <div class="card-title">${m.title}</div>
+          <div style="display:flex;gap:6px;align-items:center;margin-top:4px">
+            ${tbadge(m.type)}
+            ${m.book ? `<span style="font-size:12px;color:var(--green)">『${m.book}』</span>` : ''}
+          </div>
+        </div>
+        <span style="font-size:12px;color:var(--text3);white-space:nowrap">${fmtDate(m.date)}</span>
+      </div>
+      <div class="card-meta">
+        ${m.place ? `<span>📍 ${m.place}</span>` : ''}
+        <span>👥 참석 ${att.length}명</span>
+      </div>
+      ${m.memo ? `<div class="card-memo">${m.memo}</div>` : ''}
+      <div class="chips">${att.map(a => `<span class="chip">${a}</span>`).join('')}</div>
+      <div id="cmt-m-${m.id}"></div>
+    </div>`;
+  }).join('');
+  data.forEach(m => loadComments('meeting', m.id, `cmt-m-${m.id}`));
+}
+
+function mf(f, btn) {
+  mFilter = f;
+  document.querySelectorAll('#page-meetings .fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadMeetings();
+}
+
+async function saveMeeting() {
+  const title = document.getElementById('mt-title').value.trim();
+  if (!title) { toast('모임 이름을 입력해주세요'); return; }
+  const att = document.getElementById('mt-att').value.split(',').map(s => s.trim()).filter(Boolean);
+  const { error } = await sb.from('meetings').insert({
+    title, date: document.getElementById('mt-date').value || new Date().toISOString().slice(0,10),
+    type: document.getElementById('mt-type').value,
+    place: document.getElementById('mt-place').value.trim(),
+    book: document.getElementById('mt-book').value.trim(),
+    attendees: att,
+    memo: document.getElementById('mt-memo').value.trim(),
+    author_name: document.getElementById('mt-author').value.trim(),
+  });
+  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
+  ['mt-title','mt-date','mt-place','mt-book','mt-att','mt-memo','mt-author'].forEach(id => document.getElementById(id).value = '');
+  closeModal('m-modal');
+  toast('모임이 등록됐어요 🎉');
+  loadMeetings();
+}
+
+// ── REVIEWS ───────────────────────────────────────────
+async function loadReviews() {
+  const el = document.getElementById('review-list');
+  el.innerHTML = '<div class="loading">불러오는 중...</div>';
+  let q = sb.from('reviews').select('*').order('created_at', { ascending: false });
+  if (rFilter !== '전체') q = q.eq('type', rFilter);
+  const { data, error } = await q;
+  if (error || !data?.length) { el.innerHTML = '<div class="empty">아직 독후감이 없어요</div>'; return; }
+  el.innerHTML = data.map(r => {
+    const idx = ci(r.writer);
+    return `<div class="card">
+      <div class="rv-header">
+        <div class="avatar" style="background:${AC[idx][0]};color:${AC[idx][1]}">${(r.writer||'?')[0]}</div>
+        <div style="flex:1">
+          <div style="font-size:14px;font-weight:500">${r.writer}</div>
+          <div style="font-size:11px;color:var(--text3)">${timeAgo(r.created_at)}</div>
+        </div>
+        ${tbadge(r.type)}
+      </div>
+      <div class="rv-book">『${r.book}』 ${r.book_author ? '— ' + r.book_author : ''}</div>
+      ${r.oneliner ? `<div class="rv-oneliner">${r.oneliner}</div>` : ''}
+      ${r.title ? `<div class="rv-title">${r.title}</div>` : ''}
+      ${r.body ? `<div class="rv-body">${r.body}</div>` : ''}
+      <div id="cmt-r-${r.id}"></div>
+    </div>`;
+  }).join('');
+  data.forEach(r => loadComments('review', r.id, `cmt-r-${r.id}`));
+}
+
+function rf(f, btn) {
+  rFilter = f;
+  document.querySelectorAll('#page-reviews .fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadReviews();
+}
+
+async function saveReview() {
+  const book = document.getElementById('rv-book').value.trim();
+  const writer = document.getElementById('rv-writer').value.trim();
+  if (!book || !writer) { toast('책 제목과 작성자를 입력해주세요'); return; }
+  const { error } = await sb.from('reviews').insert({
+    book, book_author: document.getElementById('rv-bauthor').value.trim(),
+    writer, type: document.getElementById('rv-type').value,
+    oneliner: document.getElementById('rv-oneliner').value.trim(),
+    title: document.getElementById('rv-title').value.trim(),
+    body: document.getElementById('rv-body').value.trim(),
+  });
+  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
+  ['rv-book','rv-bauthor','rv-writer','rv-oneliner','rv-title','rv-body'].forEach(id => document.getElementById(id).value = '');
+  closeModal('r-modal');
+  toast('독후감이 등록됐어요 ✍️');
+  loadReviews();
+}
+
+// ── BOOKS ─────────────────────────────────────────────
+async function loadBooks() {
+  const el = document.getElementById('book-grid');
+  el.innerHTML = '<div class="loading" style="grid-column:1/-1">불러오는 중...</div>';
+  const { data, error } = await sb.from('books').select('*').order('created_at', { ascending: false });
+  if (error || !data?.length) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">등록된 도서가 없어요</div>'; return; }
+
+  const filtered = data.filter(b => {
+    if (bFilter === '전체') return true;
+    if (bFilter === '대여가능') return b.type === '대여' && b.status === '가능';
+    if (bFilter === '기부') return b.type === '기부';
+    if (bFilter === '대여중') return b.status === '대여중';
+    return true;
+  });
+
+  if (!filtered.length) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">해당 도서가 없어요</div>'; return; }
+
+  el.innerHTML = filtered.map((b, i) => {
+    const ci2 = i % BC.length;
+    const isRent = b.type === '대여', avail = b.status === '가능', rented = b.status === '대여중';
+    const st = isRent
+      ? (avail ? '<span class="badge b-green">대여 가능</span>' : '<span class="badge b-gray">대여 중</span>')
+      : '<span class="badge b-blue">기부</span>';
+    return `<div class="bk">
+      <div class="bk-spine" style="background:${BC[ci2]};color:${BT[ci2]}">${b.title.slice(0,6)}</div>
+      <div class="bk-title">${b.title}</div>
+      <div class="bk-author">${b.book_author || ''}</div>
+      ${st}
+      ${b.description ? `<div class="bk-desc">${b.description}</div>` : ''}
+      <div class="bk-owner">등록: ${b.owner_name}${rented && b.borrower_name ? ` · 대여자: ${b.borrower_name}` : ''}</div>
+      <div class="bk-actions">
+        ${isRent && avail ? `<button class="btn-s btn-green" onclick="startBorrow('${b.id}')">대여 신청</button>` : ''}
+        ${isRent && rented ? `<button class="btn-s" onclick="returnBook('${b.id}')">반납</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function bf(f, btn) {
+  bFilter = f;
+  document.querySelectorAll('#page-books .fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadBooks();
+}
+
+async function saveBook() {
+  const title = document.getElementById('bk-title').value.trim();
+  const owner = document.getElementById('bk-owner').value.trim();
+  if (!title || !owner) { toast('책 제목과 등록자를 입력해주세요'); return; }
+  const { error } = await sb.from('books').insert({
+    title, book_author: document.getElementById('bk-author').value.trim(),
+    owner_name: owner, type: document.getElementById('bk-type').value,
+    description: document.getElementById('bk-desc').value.trim(),
+    status: '가능',
+  });
+  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
+  ['bk-title','bk-author','bk-owner','bk-desc'].forEach(id => document.getElementById(id).value = '');
+  closeModal('b-modal');
+  toast('도서가 등록됐어요 📚');
+  loadBooks();
+}
+
+function startBorrow(id) {
+  borrowingId = id;
+  document.getElementById('borrow-name').value = '';
+  openModal('borrow-modal');
+}
+
+async function confirmBorrow() {
+  const name = document.getElementById('borrow-name').value.trim();
+  if (!name) { toast('이름을 입력해주세요'); return; }
+  const { error } = await sb.from('books').update({ status: '대여중', borrower_name: name }).eq('id', borrowingId);
+  if (error) { toast('오류가 발생했어요'); return; }
+  closeModal('borrow-modal');
+  toast('대여 신청됐어요 📖');
+  loadBooks();
+}
+
+async function returnBook(id) {
+  const { error } = await sb.from('books').update({ status: '가능', borrower_name: null }).eq('id', id);
+  if (error) { toast('오류가 발생했어요'); return; }
+  toast('반납 처리됐어요');
+  loadBooks();
+}
+
+// ── INIT ──────────────────────────────────────────────
+loadHome();
+</script>
+</body>
+</html>
