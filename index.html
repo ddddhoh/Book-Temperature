@@ -406,6 +406,69 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 /* GIFT REQUEST */
 .btn-gift { background: #FBF0E0; color: #9A6010; border-color: #F5D9A0; }
 .btn-gift:hover { background: #F5D9A0; }
+/* CALENDAR */
+.cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
+.cal-nav { display:flex; align-items:center; gap:12px; }
+.cal-nav button {
+  background:none; border:1px solid var(--border); border-radius:8px;
+  width:32px; height:32px; cursor:pointer; font-size:16px;
+  color:var(--text2); display:flex; align-items:center; justify-content:center;
+  transition:all 0.15s;
+}
+.cal-nav button:hover { background:var(--bg2); }
+.cal-month { font-family:var(--font-serif); font-size:20px; font-weight:600; }
+.cal-grid {
+  display:grid; grid-template-columns:repeat(7,1fr);
+  border-top:1px solid var(--border); border-left:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  background:var(--card); box-shadow:var(--shadow);
+}
+.cal-dow {
+  padding:8px 4px; text-align:center; font-size:12px;
+  font-weight:500; color:var(--text2); background:var(--bg2);
+  border-right:1px solid var(--border); border-bottom:1px solid var(--border);
+}
+.cal-dow:first-child { color:#C0392B; }
+.cal-dow:last-child { color:#3058A0; }
+.cal-cell {
+  min-height:88px; padding:6px; border-right:1px solid var(--border);
+  border-bottom:1px solid var(--border); vertical-align:top;
+  cursor:pointer; transition:background 0.12s; position:relative;
+}
+.cal-cell:hover { background:var(--bg2); }
+.cal-cell.other-month { background:var(--bg); }
+.cal-cell.other-month .cal-day { color:var(--text3); }
+.cal-cell.today .cal-day {
+  background:var(--green); color:#fff; border-radius:50%;
+  width:24px; height:24px; display:flex; align-items:center; justify-content:center;
+}
+.cal-day { font-size:13px; font-weight:500; margin-bottom:4px; width:24px; height:24px; display:flex; align-items:center; justify-content:center; }
+.cal-cell.sunday .cal-day { color:#C0392B; }
+.cal-cell.saturday .cal-day { color:#3058A0; }
+.cal-event {
+  font-size:11px; padding:1px 5px; border-radius:4px;
+  margin-bottom:2px; overflow:hidden; white-space:nowrap;
+  text-overflow:ellipsis; cursor:pointer;
+}
+.ev-모임 { background:#E8F2EE; color:#2D7A5F; }
+.ev-독서 { background:#E6F1FB; color:#3058A0; }
+.ev-공지 { background:#FBF0E0; color:#9A6010; }
+.ev-기타 { background:#F5EAF0; color:#8C3060; }
+.ev-일반 { background:#F1EFE8; color:#5F5E5A; }
+.cal-more { font-size:10px; color:var(--text3); padding-left:5px; }
+
+/* EVENT DETAIL SIDEBAR */
+.ev-list { margin-top:20px; }
+.ev-list-title { font-size:13px; font-weight:500; color:var(--text2); margin-bottom:10px; }
+.ev-item {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); padding:12px 16px; margin-bottom:8px;
+  display:flex; align-items:flex-start; gap:10px;
+}
+.ev-dot { width:10px; height:10px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.ev-item-title { font-size:14px; font-weight:500; margin-bottom:2px; }
+.ev-item-meta { font-size:12px; color:var(--text2); }
+.ev-item-actions { display:flex; gap:6px; margin-left:auto; flex-shrink:0; }
 </style>
 </head>
 <body>
@@ -416,6 +479,7 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   <button class="nav-btn" data-page="meetings" onclick="go('meetings')">모임 기록</button>
   <button class="nav-btn" data-page="reviews" onclick="go('reviews')">독후감</button>
   <button class="nav-btn" data-page="books" onclick="go('books')">도서 나눔</button>
+  <button class="nav-btn" data-page="calendar" onclick="go('calendar')">달력</button>
 </nav>
 
 <!-- HOME -->
@@ -491,6 +555,23 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   </div>
   <div class="filters" id="review-filters"></div>
   <div id="review-list"><div class="loading">불러오는 중...</div></div>
+</div>
+
+<!-- CALENDAR -->
+<div class="page" id="page-calendar">
+  <div class="cal-header">
+    <div class="cal-nav">
+      <button onclick="calPrev()">‹</button>
+      <span class="cal-month" id="cal-month-label"></span>
+      <button onclick="calNext()">›</button>
+    </div>
+    <button class="add-btn" onclick="openNewEvent()">일정 추가</button>
+  </div>
+  <div class="cal-grid" id="cal-grid"></div>
+  <div class="ev-list">
+    <div class="ev-list-title" id="ev-list-title">이달의 일정</div>
+    <div id="ev-list"></div>
+  </div>
 </div>
 
 <!-- BOOKS -->
@@ -685,6 +766,46 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     </div>
   </div>
 </div>
+<!-- MODAL: EVENT (추가/수정 공용) -->
+<div class="modal-bg" id="ev-modal">
+  <div class="modal">
+    <h2 id="ev-modal-title">일정 추가</h2>
+    <input type="hidden" id="ev-id">
+    <div class="fg"><label>일정 제목</label><input id="ev-title" placeholder="예) 6월 정기 모임"></div>
+    <div class="two-col">
+      <div class="fg"><label>날짜</label><input type="date" id="ev-date"></div>
+      <div class="fg"><label>시간 <span class="opt-note">(선택)</span></label><input type="time" id="ev-time"></div>
+    </div>
+    <div class="fg"><label>종료 날짜 <span class="opt-note">(선택 — 여러 날인 경우)</span></label><input type="date" id="ev-end-date"></div>
+    <div class="fg"><label>구분</label>
+      <select id="ev-category">
+        <option value="모임">모임</option>
+        <option value="독서">독서</option>
+        <option value="공지">공지</option>
+        <option value="기타">기타</option>
+        <option value="일반">일반</option>
+      </select>
+    </div>
+    <div class="fg"><label>메모 <span class="opt-note">(선택)</span></label><textarea id="ev-desc" placeholder="일정에 대한 메모를 남겨주세요"></textarea></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('ev-modal')">취소</button>
+      <button class="btn-save" id="ev-modal-btn" onclick="saveEvent()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: EVENT DELETE CONFIRM -->
+<div class="modal-bg" id="ev-confirm-modal">
+  <div class="modal" style="max-width:360px">
+    <h2>일정을 삭제할까요?</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">삭제한 일정은 복구할 수 없어요.</p>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('ev-confirm-modal')">취소</button>
+      <button style="padding:8px 18px;border-radius:8px;border:none;background:#C0392B;color:#fff;cursor:pointer;font-size:13px;font-family:var(--font-sans);font-weight:500" onclick="confirmDeleteEvent()">삭제</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="bk-detail-modal">
   <div class="mt-detail-modal">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
@@ -790,6 +911,7 @@ function go(page) {
   if (page === 'meetings') loadMeetings();
   if (page === 'reviews') loadReviews();
   if (page === 'books') loadBooks();
+  if (page === 'calendar') loadCalendar();
 }
 
 // ── TOAST ────────────────────────────────────────────
@@ -1563,6 +1685,208 @@ async function returnBook(id) {
   if (error) { toast('오류가 발생했어요'); return; }
   toast('반납 처리됐어요');
   loadBooks();
+}
+
+// ── CALENDAR ──────────────────────────────────────────
+let calYear = new Date().getFullYear();
+let calMonth = new Date().getMonth(); // 0-indexed
+let eventsData = [];
+let deletingEventId = null;
+const CAT_COLOR = { '모임':'#2D7A5F', '독서':'#3058A0', '공지':'#9A6010', '기타':'#8C3060', '일반':'#888' };
+const DOW = ['일','월','화','수','목','금','토'];
+
+function calPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } loadCalendar(); }
+function calNext() { calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; } loadCalendar(); }
+
+async function loadCalendar() {
+  // 해당 월 전후 데이터 쿼리
+  const firstDay = new Date(calYear, calMonth, 1);
+  const lastDay  = new Date(calYear, calMonth + 1, 0);
+  const from = firstDay.toISOString().slice(0,10);
+  const to   = lastDay.toISOString().slice(0,10);
+
+  const { data } = await sb.from('events').select('*')
+    .or(`date.gte.${from},end_date.gte.${from}`)
+    .order('date', { ascending: true });
+  eventsData = (data || []).filter(e => {
+    const eDate = e.date;
+    const eEnd  = e.end_date || e.date;
+    return eDate <= to && eEnd >= from;
+  });
+
+  renderCalendar();
+  renderEventList(null); // 이달 전체
+}
+
+function renderCalendar() {
+  document.getElementById('cal-month-label').textContent =
+    `${calYear}년 ${calMonth + 1}월`;
+
+  const grid = document.getElementById('cal-grid');
+  const today = new Date().toISOString().slice(0,10);
+  const firstDow = new Date(calYear, calMonth, 1).getDay(); // 0=Sun
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrev  = new Date(calYear, calMonth, 0).getDate();
+
+  let html = DOW.map(d => `<div class="cal-dow">${d}</div>`).join('');
+
+  // 이전달 빈칸
+  for (let i = 0; i < firstDow; i++) {
+    const d = daysInPrev - firstDow + 1 + i;
+    const dateStr = `${calYear}-${String(calMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    html += `<div class="cal-cell other-month" onclick="openNewEventOnDate('${dateStr}')">
+      <div class="cal-day">${d}</div>
+    </div>`;
+  }
+
+  // 이번달
+  for (let d = 1; d <= daysInMonth; d++) {
+    const dateStr = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday = dateStr === today;
+    const dow = new Date(calYear, calMonth, d).getDay();
+    const cls = ['cal-cell', isToday ? 'today' : '', dow===0?'sunday':dow===6?'saturday':''].filter(Boolean).join(' ');
+
+    // 이날의 이벤트
+    const dayEvs = eventsData.filter(e => {
+      const s = e.date, en = e.end_date || e.date;
+      return s <= dateStr && en >= dateStr;
+    });
+    const maxShow = 2;
+    const evHtml = dayEvs.slice(0, maxShow).map(e =>
+      `<div class="cal-event ev-${e.category||'일반'}" onclick="event.stopPropagation();renderEventList('${dateStr}')">${e.title}</div>`
+    ).join('');
+    const moreHtml = dayEvs.length > maxShow
+      ? `<div class="cal-more">+${dayEvs.length - maxShow}개</div>` : '';
+
+    html += `<div class="${cls}" onclick="openNewEventOnDate('${dateStr}')">
+      <div class="cal-day">${d}</div>
+      ${evHtml}${moreHtml}
+    </div>`;
+  }
+
+  // 다음달 빈칸 (7의 배수 채우기)
+  const total = firstDow + daysInMonth;
+  const remaining = total % 7 === 0 ? 0 : 7 - (total % 7);
+  for (let d = 1; d <= remaining; d++) {
+    const m = String(calMonth + 2 > 12 ? 1 : calMonth + 2).padStart(2,'0');
+    const y = calMonth + 2 > 12 ? calYear + 1 : calYear;
+    const dateStr = `${y}-${m}-${String(d).padStart(2,'0')}`;
+    html += `<div class="cal-cell other-month" onclick="openNewEventOnDate('${dateStr}')">
+      <div class="cal-day">${d}</div>
+    </div>`;
+  }
+
+  grid.innerHTML = html;
+}
+
+function renderEventList(dateStr) {
+  const title = document.getElementById('ev-list-title');
+  const list  = document.getElementById('ev-list');
+
+  let filtered;
+  if (dateStr) {
+    filtered = eventsData.filter(e => {
+      const s = e.date, en = e.end_date || e.date;
+      return s <= dateStr && en >= dateStr;
+    });
+    title.textContent = `${dateStr.slice(5).replace('-','월 ')}일 일정`;
+  } else {
+    filtered = eventsData;
+    title.textContent = `${calMonth+1}월 전체 일정 (${filtered.length}건)`;
+  }
+
+  if (!filtered.length) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:12px 0">일정이 없어요. 날짜를 클릭해서 추가해보세요!</div>';
+    return;
+  }
+
+  list.innerHTML = filtered.map(e => {
+    const color = CAT_COLOR[e.category] || '#888';
+    const dateLabel = e.end_date && e.end_date !== e.date
+      ? `${e.date} ~ ${e.end_date}` : e.date;
+    return `<div class="ev-item">
+      <div class="ev-dot" style="background:${color}"></div>
+      <div style="flex:1;min-width:0">
+        <div class="ev-item-title">${e.title}</div>
+        <div class="ev-item-meta">${dateLabel}${e.time ? ' · ' + e.time : ''}${e.category ? ' · ' + e.category : ''}</div>
+        ${e.description ? `<div style="font-size:12px;color:var(--text3);margin-top:3px">${e.description}</div>` : ''}
+      </div>
+      <div class="ev-item-actions">
+        <button class="btn-edit" onclick="openEditEvent('${e.id}')">수정</button>
+        <button class="btn-delete" onclick="startDeleteEvent('${e.id}')">삭제</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openNewEvent() {
+  document.getElementById('ev-modal-title').textContent = '일정 추가';
+  document.getElementById('ev-modal-btn').textContent = '저장';
+  document.getElementById('ev-id').value = '';
+  ['ev-title','ev-time','ev-desc'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ev-date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('ev-end-date').value = '';
+  document.getElementById('ev-category').value = '일반';
+  openModal('ev-modal');
+}
+
+function openNewEventOnDate(dateStr) {
+  openNewEvent();
+  document.getElementById('ev-date').value = dateStr;
+}
+
+function openEditEvent(id) {
+  const e = eventsData.find(x => x.id === id);
+  if (!e) return;
+  document.getElementById('ev-modal-title').textContent = '일정 수정';
+  document.getElementById('ev-modal-btn').textContent = '수정 저장';
+  document.getElementById('ev-id').value = e.id;
+  document.getElementById('ev-title').value = e.title || '';
+  document.getElementById('ev-date').value = e.date || '';
+  document.getElementById('ev-end-date').value = e.end_date || '';
+  document.getElementById('ev-time').value = e.time || '';
+  document.getElementById('ev-category').value = e.category || '일반';
+  document.getElementById('ev-desc').value = e.description || '';
+  openModal('ev-modal');
+}
+
+async function saveEvent() {
+  const title = document.getElementById('ev-title').value.trim();
+  const date  = document.getElementById('ev-date').value;
+  if (!title || !date) { toast('제목과 날짜를 입력해주세요'); return; }
+  const payload = {
+    title, date,
+    end_date:    document.getElementById('ev-end-date').value || null,
+    time:        document.getElementById('ev-time').value || null,
+    category:    document.getElementById('ev-category').value,
+    description: document.getElementById('ev-desc').value.trim() || null,
+  };
+  const editId = document.getElementById('ev-id').value;
+  let error;
+  if (editId) {
+    ({ error } = await sb.from('events').update(payload).eq('id', editId));
+  } else {
+    ({ error } = await sb.from('events').insert(payload));
+  }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); return; }
+  closeModal('ev-modal');
+  toast(editId ? '일정이 수정됐어요 ✏️' : '일정이 추가됐어요 📅');
+  loadCalendar();
+}
+
+function startDeleteEvent(id) {
+  deletingEventId = id;
+  openModal('ev-confirm-modal');
+}
+
+async function confirmDeleteEvent() {
+  if (!deletingEventId) return;
+  const { error } = await sb.from('events').delete().eq('id', deletingEventId);
+  if (error) { toast('오류: ' + (error.message||error)); return; }
+  closeModal('ev-confirm-modal');
+  toast('일정이 삭제됐어요');
+  deletingEventId = null;
+  loadCalendar();
 }
 
 // ── INIT ──────────────────────────────────────────────
