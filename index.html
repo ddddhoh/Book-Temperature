@@ -342,10 +342,8 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <span class="ph-title">독후감 아카이브</span>
     <button class="add-btn" onclick="openModal('r-modal')">독후감 등록</button>
   </div>
-  <div class="filters">
+  <div class="filters" id="review-filters">
     <button class="fb on" onclick="rf('전체',this)">전체</button>
-    <button class="fb" onclick="rf('지정도서',this)">지정도서</button>
-    <button class="fb" onclick="rf('자유독서',this)">자유독서</button>
   </div>
   <div id="review-list"><div class="loading">불러오는 중...</div></div>
 </div>
@@ -641,11 +639,26 @@ async function saveMeeting() {
 async function loadReviews() {
   const el = document.getElementById('review-list');
   el.innerHTML = '<div class="loading">불러오는 중...</div>';
-  let q = sb.from('reviews').select('*').order('created_at', { ascending: false });
-  if (rFilter !== '전체') q = q.eq('type', rFilter);
-  const { data, error } = await q;
-  if (error || !data?.length) { el.innerHTML = '<div class="empty">아직 독후감이 없어요</div>'; return; }
-  el.innerHTML = data.map(r => {
+
+  // 전체 데이터 가져오기 (필터는 클라이언트에서)
+  const { data, error } = await sb.from('reviews').select('*').order('created_at', { ascending: false });
+  if (error || !data?.length) {
+    el.innerHTML = '<div class="empty">아직 독후감이 없어요</div>';
+    buildWriterFilters([]);
+    return;
+  }
+
+  // 글쓴이 목록 추출 → 필터 버튼 동적 생성
+  buildWriterFilters(data);
+
+  // 필터 적용
+  const filtered = rFilter === '전체' ? data : data.filter(r => r.writer === rFilter);
+  if (!filtered.length) {
+    el.innerHTML = '<div class="empty">해당 회원의 독후감이 없어요</div>';
+    return;
+  }
+
+  el.innerHTML = filtered.map(r => {
     const idx = ci(r.writer);
     return `<div class="card">
       <div class="rv-header">
@@ -663,12 +676,20 @@ async function loadReviews() {
       <div id="cmt-r-${r.id}"></div>
     </div>`;
   }).join('');
-  data.forEach(r => loadComments('review', r.id, `cmt-r-${r.id}`));
+  filtered.forEach(r => loadComments('review', r.id, `cmt-r-${r.id}`));
+}
+
+function buildWriterFilters(data) {
+  const writers = ['전체', ...new Set(data.map(r => r.writer).filter(Boolean))];
+  const container = document.getElementById('review-filters');
+  container.innerHTML = writers.map(w =>
+    `<button class="fb ${w === rFilter ? 'on' : ''}" onclick="rf('${w}',this)">${w}</button>`
+  ).join('');
 }
 
 function rf(f, btn) {
   rFilter = f;
-  document.querySelectorAll('#page-reviews .fb').forEach(b => b.classList.remove('on'));
+  document.querySelectorAll('#review-filters .fb').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
   loadReviews();
 }
