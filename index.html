@@ -505,10 +505,10 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   margin-bottom:2px; overflow:hidden; white-space:nowrap;
   text-overflow:ellipsis; cursor:pointer;
 }
-.ev-정기모임 { background:#E8F2EE; color:#2D7A5F; }
-.ev-자유독서 { background:#E6F1FB; color:#3058A0; }
-.ev-테마독서 { background:#FBF0E0; color:#9A6010; }
-.ev-기타     { background:#F5EAF0; color:#8C3060; }
+.ev-정기모임 { background:#2D7A5F; color:#fff; }
+.ev-자유독서 { background:#3058A0; color:#fff; }
+.ev-테마독서 { background:#E67E22; color:#fff; }
+.ev-기타     { background:#8C3060; color:#fff; }
 .cal-more { font-size:10px; color:var(--text3); padding-left:5px; }
 
 /* EVENT DETAIL SIDEBAR */
@@ -634,6 +634,12 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
       <button onclick="calNext()">›</button>
     </div>
     <button class="add-btn" onclick="openNewEvent()">일정 추가</button>
+  </div>
+  <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px">
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px"><span style="width:10px;height:10px;border-radius:3px;background:#2D7A5F;display:inline-block"></span>정기 모임</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px"><span style="width:10px;height:10px;border-radius:3px;background:#3058A0;display:inline-block"></span>자유 독서</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px"><span style="width:10px;height:10px;border-radius:3px;background:#E67E22;display:inline-block"></span>테마 독서</span>
+    <span style="display:flex;align-items:center;gap:5px;font-size:12px"><span style="width:10px;height:10px;border-radius:3px;background:#8C3060;display:inline-block"></span>기타</span>
   </div>
   <div class="cal-grid" id="cal-grid"></div>
   <div class="ev-list">
@@ -1870,7 +1876,7 @@ let calYear = new Date().getFullYear();
 let calMonth = new Date().getMonth(); // 0-indexed
 let eventsData = [];
 let deletingEventId = null;
-const CAT_COLOR = { '정기모임':'#2D7A5F', '자유독서':'#3058A0', '테마독서':'#9A6010', '기타':'#8C3060' };
+const CAT_COLOR = { '정기모임':'#2D7A5F', '자유독서':'#3058A0', '테마독서':'#E67E22', '기타':'#8C3060' };
 const DOW = ['일','월','화','수','목','금','토'];
 
 function calPrev() { calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; } loadCalendar(); }
@@ -1931,7 +1937,7 @@ function renderCalendar() {
     });
     const maxShow = 2;
     const evHtml = dayEvs.slice(0, maxShow).map(e =>
-      `<div class="cal-event ev-${e.category||'일반'}" onclick="event.stopPropagation();renderEventList('${dateStr}')">${e.title}</div>`
+      `<div class="cal-event ev-${e.category||'기타'}" onclick="event.stopPropagation();renderEventList('${dateStr}')">${e.title}</div>`
     ).join('');
     const moreHtml = dayEvs.length > maxShow
       ? `<div class="cal-more">+${dayEvs.length - maxShow}개</div>` : '';
