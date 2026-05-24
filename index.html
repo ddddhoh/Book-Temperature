@@ -685,6 +685,25 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     </div>
   </div>
 </div>
+<div class="modal-bg" id="bk-detail-modal">
+  <div class="mt-detail-modal">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
+      <div>
+        <div style="font-family:var(--font-serif);font-size:18px;font-weight:600;margin-bottom:4px" id="bkd-title"></div>
+        <div style="font-size:13px;color:var(--text2);margin-bottom:8px" id="bkd-author"></div>
+        <span id="bkd-badge" class="badge"></span>
+      </div>
+      <div id="bkd-actions" style="display:flex;gap:6px;flex-shrink:0;margin-left:12px;margin-top:4px"></div>
+    </div>
+    <div id="bkd-desc" style="font-size:13px;color:var(--text2);margin-bottom:8px;line-height:1.6"></div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:14px" id="bkd-owner"></div>
+    <div style="font-size:12px;color:var(--text2);background:var(--bg2);border-radius:8px;padding:8px 12px;margin-bottom:12px">
+      💬 댓글로 교환 날짜, 장소를 협의해 보세요
+    </div>
+    <div id="bkd-comments"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="borrow-modal">
   <div class="modal">
     <h2>대여 신청</h2>
@@ -820,11 +839,29 @@ async function loadComments(targetType, targetId, containerId) {
       <div class="comments-title">댓글 ${comments.length}개</div>
       ${comments.map(c => {
         const idx = ci(c.author_name);
-        return `<div class="comment">
-          <div class="avatar" style="width:28px;height:28px;font-size:11px;background:${AC[idx][0]};color:${AC[idx][1]}">${(c.author_name||'?')[0]}</div>
-          <div class="comment-body">
-            <div class="comment-author">${c.author_name}</div>
-            <div class="comment-text">${c.body}</div>
+        return `<div class="comment" id="cmt-item-${c.id}">
+          <div class="avatar" style="width:28px;height:28px;font-size:11px;background:${AC[idx][0]};color:${AC[idx][1]};flex-shrink:0">${(c.author_name||'?')[0]}</div>
+          <div class="comment-body" style="flex:1">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div class="comment-author">${c.author_name}</div>
+              <div style="display:flex;gap:4px;flex-shrink:0">
+                <button onclick="startEditComment('${c.id}','${containerId}','${targetType}','${targetId}')"
+                  style="background:none;border:none;font-size:11px;color:var(--text3);cursor:pointer;padding:2px 4px">수정</button>
+                <button onclick="deleteComment('${c.id}','${containerId}','${targetType}','${targetId}')"
+                  style="background:none;border:none;font-size:11px;color:#C0392B;cursor:pointer;padding:2px 4px">삭제</button>
+              </div>
+            </div>
+            <div class="comment-text" id="cmt-text-${c.id}">${c.body}</div>
+            <div id="cmt-edit-${c.id}" style="display:none;margin-top:4px">
+              <input style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--bg);font-size:13px;font-family:var(--font-sans);color:var(--text)"
+                id="cmt-edit-input-${c.id}" value="${c.body.replace(/"/g,'&quot;')}">
+              <div style="display:flex;gap:6px;margin-top:4px">
+                <button onclick="submitEditComment('${c.id}','${containerId}','${targetType}','${targetId}')"
+                  style="padding:4px 12px;border-radius:6px;background:var(--green);color:#fff;border:none;font-size:12px;cursor:pointer">저장</button>
+                <button onclick="cancelEditComment('${c.id}')"
+                  style="padding:4px 12px;border-radius:6px;background:none;border:1px solid var(--border);font-size:12px;cursor:pointer;color:var(--text2)">취소</button>
+              </div>
+            </div>
             <div class="comment-time">${timeAgo(c.created_at)}</div>
           </div>
         </div>`;
@@ -843,7 +880,35 @@ async function postComment(targetType, targetId, containerId) {
   const body = document.getElementById('cbody-' + containerId)?.value.trim();
   if (!name || !body) { toast('이름과 댓글을 입력해주세요'); return; }
   const { error } = await sb.from('comments').insert({ target_type: targetType, target_id: targetId, author_name: name, body });
-  if (error) { toast('오류가 발생했어요'); return; }
+  if (error) { toast('오류: ' + (error.message||error)); return; }
+  document.getElementById('cbody-' + containerId).value = '';
+  await loadComments(targetType, targetId, containerId);
+}
+
+function startEditComment(cid, containerId, targetType, targetId) {
+  document.getElementById('cmt-text-' + cid).style.display = 'none';
+  document.getElementById('cmt-edit-' + cid).style.display = 'block';
+  document.getElementById('cmt-edit-input-' + cid).focus();
+}
+
+function cancelEditComment(cid) {
+  document.getElementById('cmt-text-' + cid).style.display = '';
+  document.getElementById('cmt-edit-' + cid).style.display = 'none';
+}
+
+async function submitEditComment(cid, containerId, targetType, targetId) {
+  const body = document.getElementById('cmt-edit-input-' + cid).value.trim();
+  if (!body) { toast('내용을 입력해주세요'); return; }
+  const { error } = await sb.from('comments').update({ body }).eq('id', cid);
+  if (error) { toast('오류: ' + (error.message||error)); return; }
+  await loadComments(targetType, targetId, containerId);
+}
+
+async function deleteComment(cid, containerId, targetType, targetId) {
+  if (!confirm('댓글을 삭제할까요?')) return;
+  const { error } = await sb.from('comments').delete().eq('id', cid);
+  if (error) { toast('오류: ' + (error.message||error)); return; }
+  toast('댓글이 삭제됐어요');
   await loadComments(targetType, targetId, containerId);
 }
 
@@ -1339,7 +1404,7 @@ async function loadBooks() {
     const st = isRent
       ? (avail ? '<span class="badge b-green">대여 가능</span>' : '<span class="badge b-gray">대여 중</span>')
       : (owned ? '<span class="badge b-amber">소장 중</span>' : '<span class="badge b-blue">기부</span>');
-    return `<div class="bk" data-bid="${b.id}">
+    return `<div class="bk" data-bid="${b.id}" style="cursor:pointer" onclick="openBookDetail('${b.id}')">
       <button class="bk-menu-btn" onclick="toggleBkMenu(event,'menu-${b.id}')">⋯</button>
       <div class="bk-dropdown" id="menu-${b.id}">
         <button onclick="closeBkMenu();openEditBook('${b.id}')">✏️ 수정</button>
@@ -1351,7 +1416,7 @@ async function loadBooks() {
       ${st}
       ${b.description ? `<div class="bk-desc">${b.description}</div>` : ''}
       <div class="bk-owner">등록: ${b.owner_name}${(rented||owned) && b.borrower_name ? ` · ${owned?'소장':'대여자'}: ${b.borrower_name}` : ''}</div>
-      <div class="bk-actions">
+      <div class="bk-actions" onclick="event.stopPropagation()">
         ${isRent && avail ? `<button class="btn-s btn-green" onclick="startBorrow('${b.id}')">대여 신청</button>` : ''}
         ${isRent && rented ? `<button class="btn-s" onclick="returnBook('${b.id}')">반납</button>` : ''}
         ${isGift && avail ? `<button class="btn-s btn-gift" onclick="startGift('${b.id}')">받아가기</button>` : ''}
@@ -1359,6 +1424,37 @@ async function loadBooks() {
       </div>
     </div>`;
   }).join('');
+}
+
+function openBookDetail(id) {
+  const b = booksData.find(x => x.id === id);
+  if (!b) return;
+  const isRent = b.type === '대여', isGift = b.type === '기부';
+  const avail = b.status === '가능', rented = b.status === '대여중', owned = b.status === '소장중';
+
+  document.getElementById('bkd-title').textContent = b.title;
+  document.getElementById('bkd-author').textContent = b.book_author || '';
+  document.getElementById('bkd-desc').textContent = b.description || '';
+  document.getElementById('bkd-owner').textContent =
+    `등록: ${b.owner_name}${(rented||owned) && b.borrower_name ? ` · ${owned?'소장':'대여자'}: ${b.borrower_name}` : ''}`;
+
+  const badge = document.getElementById('bkd-badge');
+  if (isRent) {
+    badge.textContent = avail ? '대여 가능' : '대여 중';
+    badge.className = 'badge ' + (avail ? 'b-green' : 'b-gray');
+  } else {
+    badge.textContent = owned ? '소장 중' : '기부';
+    badge.className = 'badge ' + (owned ? 'b-amber' : 'b-blue');
+  }
+
+  const actions = document.getElementById('bkd-actions');
+  actions.innerHTML =
+    (isRent && avail ? `<button class="btn-s btn-green" onclick="startBorrow('${b.id}');closeModal('bk-detail-modal')">대여 신청</button>` : '') +
+    (isRent && rented ? `<button class="btn-s" onclick="returnBook('${b.id}');closeModal('bk-detail-modal')">반납</button>` : '') +
+    (isGift && avail ? `<button class="btn-s btn-gift" onclick="startGift('${b.id}');closeModal('bk-detail-modal')">받아가기</button>` : '');
+
+  openModal('bk-detail-modal');
+  loadComments('book', b.id, 'bkd-comments');
 }
 
 function bf(f, btn) {
