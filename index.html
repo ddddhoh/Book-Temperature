@@ -952,7 +952,7 @@ async function saveMeeting() {
   } else {
     ({ error } = await sb.from('meetings').insert(payload));
   }
-  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); console.error(error); return; }
   closeModal('m-modal');
   toast(editId ? '모임이 수정됐어요 ✏️' : '모임이 등록됐어요 🎉');
   loadMeetings();
@@ -1177,7 +1177,7 @@ async function saveReview() {
   } else {
     ({ error } = await sb.from('reviews').insert(payload));
   }
-  if (error) { toast('저장 중 오류가 발생했어요'); console.error(error); return; }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); console.error(error); return; }
   delete coverCache[payload.book + (payload.book_author||'')];
   closeModal('r-modal');
   toast(editId ? '독후감이 수정됐어요 ✏️' : '독후감이 등록됐어요 ✍️');
@@ -1273,7 +1273,7 @@ async function confirmBorrow() {
   const name = document.getElementById('borrow-name').value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
   const { error } = await sb.from('books').update({ status: '대여중', borrower_name: name }).eq('id', borrowingId);
-  if (error) { toast('오류가 발생했어요'); console.error(error); return; }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); console.error(error); return; }
   closeModal('borrow-modal');
   toast('대여 신청됐어요 📖');
   loadBooks();
@@ -1289,7 +1289,7 @@ async function confirmGift() {
   const name = document.getElementById('gift-name').value.trim();
   if (!name) { toast('이름을 입력해주세요'); return; }
   const { error } = await sb.from('books').update({ status: '소장중', borrower_name: name }).eq('id', giftingId);
-  if (error) { toast('오류가 발생했어요'); console.error(error); return; }
+  if (error) { toast('오류: ' + (error.message || JSON.stringify(error))); console.error(error); return; }
   closeModal('gift-modal');
   toast('신청됐어요! 등록자에게 연락해 주세요 🎁');
   giftingId = null;
