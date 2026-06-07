@@ -461,6 +461,57 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
 .mini-ev-title { font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; }
 .mini-ev-date  { font-size:11px; color:var(--text3); white-space:nowrap; }
 
+/* PROJECT CARDS */
+.proj-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:16px; }
+.proj-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:var(--radius); overflow:hidden;
+  box-shadow:var(--shadow); cursor:pointer; transition:transform 0.18s;
+  position:relative;
+}
+.proj-card:hover { transform:translateY(-2px); }
+.proj-thumb {
+  width:100%; aspect-ratio:16/9; overflow:hidden;
+  display:flex; align-items:center; justify-content:center;
+  position:relative;
+}
+.proj-thumb img { width:100%; height:100%; object-fit:cover; display:block; }
+.proj-thumb-fallback {
+  width:100%; height:100%;
+  display:flex; flex-direction:column; align-items:center;
+  justify-content:center; gap:6px; font-size:13px;
+  font-weight:500; text-align:center; padding:16px;
+}
+.proj-status-badge {
+  position:absolute; top:8px; left:8px;
+  padding:3px 9px; border-radius:10px; font-size:11px; font-weight:500;
+}
+.st-진행중 { background:#2D7A5F; color:#fff; }
+.st-완료   { background:#3058A0; color:#fff; }
+.st-예정   { background:#E67E22; color:#fff; }
+.proj-body { padding:14px 16px; }
+.proj-title { font-size:15px; font-weight:500; margin-bottom:6px; }
+.proj-period { font-size:12px; color:var(--text2); margin-bottom:6px; display:flex; align-items:center; gap:4px; }
+.proj-desc { font-size:13px; color:var(--text2); line-height:1.6; margin-bottom:10px; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; }
+.proj-members { display:flex; gap:5px; flex-wrap:wrap; }
+.proj-member-chip { background:var(--bg2); border-radius:8px; padding:2px 8px; font-size:11px; color:var(--text2); }
+
+/* PROJECT DETAIL MODAL */
+.proj-detail-modal {
+  background:var(--card); border-radius:14px;
+  padding:0; width:640px; max-width:96vw;
+  max-height:90vh; overflow-y:auto;
+  box-shadow:0 8px 40px rgba(0,0,0,0.18);
+  animation:slideUp 0.2s ease;
+}
+.proj-detail-photo {
+  width:100%; aspect-ratio:16/9; overflow:hidden;
+  border-radius:14px 14px 0 0; background:var(--bg2);
+  display:flex; align-items:center; justify-content:center;
+}
+.proj-detail-photo img { width:100%; height:100%; object-fit:cover; display:block; }
+.proj-detail-body { padding:24px 28px; }
+
 /* CALENDAR */
 .cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:20px; }
 .cal-nav { display:flex; align-items:center; gap:12px; }
@@ -532,6 +583,7 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   <button class="nav-btn active" data-page="home" onclick="go('home')">홈</button>
   <button class="nav-btn" data-page="meetings" onclick="go('meetings')">모임 기록</button>
   <button class="nav-btn" data-page="reviews" onclick="go('reviews')">독후감</button>
+  <button class="nav-btn" data-page="projects" onclick="go('projects')">프로젝트</button>
   <button class="nav-btn" data-page="books" onclick="go('books')">도서 나눔</button>
   <button class="nav-btn" data-page="calendar" onclick="go('calendar')">달력</button>
 </nav>
@@ -646,6 +698,21 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
     <div class="ev-list-title" id="ev-list-title">이달의 일정</div>
     <div id="ev-list"></div>
   </div>
+</div>
+
+<!-- PROJECTS -->
+<div class="page" id="page-projects">
+  <div class="ph">
+    <span class="ph-title">프로젝트</span>
+    <button class="add-btn" onclick="openNewProject()">프로젝트 추가</button>
+  </div>
+  <div class="filters">
+    <button class="fb on" onclick="pfilt('전체',this)">전체</button>
+    <button class="fb" onclick="pfilt('진행중',this)">진행 중</button>
+    <button class="fb" onclick="pfilt('완료',this)">완료</button>
+    <button class="fb" onclick="pfilt('예정',this)">예정</button>
+  </div>
+  <div class="proj-grid" id="proj-grid"><div class="loading" style="grid-column:1/-1">불러오는 중...</div></div>
 </div>
 
 <!-- BOOKS -->
@@ -879,6 +946,81 @@ body { font-family: var(--font-sans); background: var(--bg); color: var(--text);
   </div>
 </div>
 
+<!-- MODAL: PROJECT (추가/수정 공용) -->
+<div class="modal-bg" id="proj-modal">
+  <div class="modal">
+    <h2 id="proj-modal-title">프로젝트 추가</h2>
+    <input type="hidden" id="pj-id">
+    <div class="fg"><label>프로젝트 이름</label><input id="pj-title" placeholder="예) 북클럽 뉴스레터 제작"></div>
+    <div class="two-col">
+      <div class="fg"><label>시작일</label><input type="date" id="pj-start"></div>
+      <div class="fg"><label>종료일 <span class="opt-note">(선택)</span></label><input type="date" id="pj-end"></div>
+    </div>
+    <div class="fg"><label>상태</label>
+      <select id="pj-status">
+        <option value="예정">예정</option>
+        <option value="진행중">진행 중</option>
+        <option value="완료">완료</option>
+      </select>
+    </div>
+    <div class="fg"><label>참여자 <span class="opt-note">(쉼표로 구분)</span></label><input id="pj-members" placeholder="김민지, 이서윤, 박지훈"></div>
+    <div class="fg"><label>내용</label><textarea id="pj-desc" placeholder="프로젝트 내용, 목표, 진행 방식 등을 적어주세요" style="min-height:90px"></textarea></div>
+    <div class="fg">
+      <label>사진 <span class="opt-note">(URL 입력 또는 파일 업로드)</span></label>
+      <div style="display:flex;gap:10px;align-items:flex-start">
+        <div id="pj-photo-preview" style="width:72px;height:48px;border-radius:6px;background:var(--bg2);flex-shrink:0;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3);border:1px dashed var(--border)">사진</div>
+        <div style="flex:1">
+          <input id="pj-photo-url" placeholder="이미지 URL 입력" style="margin-bottom:6px" oninput="updatePjPhotoPreview(this.value)">
+          <label style="display:inline-block;padding:6px 12px;border-radius:8px;border:1px solid var(--border);background:var(--bg);font-size:12px;cursor:pointer;color:var(--text2)">
+            📁 파일 업로드
+            <input type="file" id="pj-photo-file" accept="image/*" style="display:none" onchange="handlePjPhotoFile(this)">
+          </label>
+        </div>
+      </div>
+    </div>
+    <div class="fg"><label>작성자</label><input id="pj-author" placeholder="이름"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('proj-modal')">취소</button>
+      <button class="btn-save" id="proj-modal-btn" onclick="saveProject()">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PROJECT DETAIL -->
+<div class="modal-bg" id="proj-detail-modal">
+  <div class="proj-detail-modal">
+    <div class="proj-detail-photo" id="pjd-photo"></div>
+    <div class="proj-detail-body">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px">
+        <div>
+          <div style="font-family:var(--font-serif);font-size:20px;font-weight:600;margin-bottom:6px" id="pjd-title"></div>
+          <span id="pjd-status-badge" class="proj-status-badge" style="position:static;display:inline-block"></span>
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0;margin-left:12px">
+          <button class="btn-edit" id="pjd-edit-btn">수정</button>
+          <button class="btn-delete" id="pjd-delete-btn">삭제</button>
+        </div>
+      </div>
+      <div class="proj-period" id="pjd-period"></div>
+      <div style="margin-bottom:12px" id="pjd-members"></div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.8;white-space:pre-line;margin-bottom:16px" id="pjd-desc"></div>
+      <div id="pjd-comments"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PROJECT DELETE CONFIRM -->
+<div class="modal-bg" id="proj-confirm-modal">
+  <div class="modal" style="max-width:360px">
+    <h2>프로젝트를 삭제할까요?</h2>
+    <p style="font-size:13px;color:var(--text2);margin-bottom:16px;line-height:1.6">삭제한 프로젝트는 복구할 수 없어요.</p>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal('proj-confirm-modal')">취소</button>
+      <button style="padding:8px 18px;border-radius:8px;border:none;background:#C0392B;color:#fff;cursor:pointer;font-size:13px;font-family:var(--font-sans);font-weight:500" onclick="confirmDeleteProject()">삭제</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-bg" id="bk-detail-modal">
   <div class="mt-detail-modal">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px">
@@ -984,6 +1126,7 @@ function go(page) {
   if (page === 'meetings') loadMeetings();
   if (page === 'reviews') loadReviews();
   if (page === 'books') loadBooks();
+  if (page === 'projects') loadProjects();
   if (page === 'calendar') loadCalendar();
 }
 
@@ -1869,6 +2012,180 @@ function renderMiniEvList(dateStr) {
       <div class="mini-ev-date">${dateLabel}${e.time ? ' '+e.time : ''}</div>
     </div>`;
   }).join('');
+}
+
+// ── PROJECTS ──────────────────────────────────────────
+const PROJ_COLORS = [
+  ['#E8F2EE','#2D7A5F'],['#E6F1FB','#3058A0'],['#FBF0E0','#9A6010'],
+  ['#F5EAF0','#8C3060'],['#EEF0FB','#3A4EA0'],['#EAF3DE','#3B6D11'],
+];
+let projectsData = [];
+let deletingProjectId = null;
+let pFilter = '전체';
+
+function updatePjPhotoPreview(url) {
+  const p = document.getElementById('pj-photo-preview');
+  if (!p) return;
+  p.innerHTML = url
+    ? `<img src="${url}" style="width:100%;height:100%;object-fit:cover" onerror="this.parentElement.innerHTML='사진'">`
+    : '사진';
+}
+
+function handlePjPhotoFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    document.getElementById('pj-photo-url').value = e.target.result;
+    updatePjPhotoPreview(e.target.result);
+  };
+  reader.readAsDataURL(file);
+}
+
+async function loadProjects() {
+  const el = document.getElementById('proj-grid');
+  el.innerHTML = '<div class="loading" style="grid-column:1/-1">불러오는 중...</div>';
+  const { data, error } = await sb.from('projects').select('*').order('created_at', { ascending: false });
+  if (error || !data?.length) {
+    el.innerHTML = '<div class="empty" style="grid-column:1/-1">아직 프로젝트가 없어요</div>';
+    projectsData = []; return;
+  }
+  projectsData = data;
+  const filtered = pFilter === '전체' ? data : data.filter(p => p.status === pFilter);
+  if (!filtered.length) { el.innerHTML = '<div class="empty" style="grid-column:1/-1">해당 프로젝트가 없어요</div>'; return; }
+
+  el.innerHTML = filtered.map((p, i) => {
+    const [bg, fg] = PROJ_COLORS[i % PROJ_COLORS.length];
+    const members = p.members || [];
+    const thumb = p.photo_url
+      ? `<img src="${p.photo_url}" alt="${p.title}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'">`
+      : `<div class="proj-thumb-fallback" style="background:${bg};color:${fg}">
+           <div style="font-size:28px">📋</div>
+           <div>${p.title}</div>
+         </div>`;
+    const period = p.start_date
+      ? `${p.start_date.slice(0,7).replace('-','.')} ${p.end_date ? '~ ' + p.end_date.slice(0,7).replace('-','.') : '~ 진행중'}`
+      : '';
+    return `<div class="proj-card" onclick="openProjectDetail('${p.id}')">
+      <div class="proj-thumb">
+        ${thumb}
+        <span class="proj-status-badge st-${p.status}">${p.status}</span>
+      </div>
+      <div class="proj-body">
+        <div class="proj-title">${p.title}</div>
+        ${period ? `<div class="proj-period">📅 ${period}</div>` : ''}
+        ${p.description ? `<div class="proj-desc">${p.description}</div>` : ''}
+        <div class="proj-members">
+          ${members.slice(0,4).map(m => `<span class="proj-member-chip">${m}</span>`).join('')}
+          ${members.length > 4 ? `<span class="proj-member-chip">+${members.length-4}</span>` : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function pfilt(f, btn) {
+  pFilter = f;
+  document.querySelectorAll('#page-projects .fb').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  loadProjects();
+}
+
+function openProjectDetail(id) {
+  const p = projectsData.find(x => x.id === id);
+  if (!p) return;
+  const members = p.members || [];
+
+  // 사진
+  const photoEl = document.getElementById('pjd-photo');
+  photoEl.innerHTML = p.photo_url
+    ? `<img src="${p.photo_url}" alt="${p.title}" style="width:100%;height:100%;object-fit:cover;display:block">`
+    : `<div style="width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:40px;background:var(--bg2)">📋</div>`;
+  photoEl.style.display = p.photo_url ? '' : 'flex';
+
+  document.getElementById('pjd-title').textContent = p.title;
+  const sb2 = document.getElementById('pjd-status-badge');
+  sb2.textContent = p.status; sb2.className = `proj-status-badge st-${p.status}`;
+
+  const period = [p.start_date, p.end_date].filter(Boolean).join(' ~ ');
+  document.getElementById('pjd-period').innerHTML = period ? `📅 ${period}` : '';
+
+  document.getElementById('pjd-members').innerHTML = members.length
+    ? `<div style="font-size:12px;color:var(--text3);margin-bottom:5px">참여자</div>
+       <div style="display:flex;gap:5px;flex-wrap:wrap">${members.map(m=>`<span class="proj-member-chip">${m}</span>`).join('')}</div>`
+    : '';
+
+  document.getElementById('pjd-desc').textContent = p.description || '';
+
+  document.getElementById('pjd-edit-btn').onclick = () => { closeModal('proj-detail-modal'); openEditProject(p); };
+  document.getElementById('pjd-delete-btn').onclick = () => { deletingProjectId = p.id; openModal('proj-confirm-modal'); };
+
+  openModal('proj-detail-modal');
+  loadComments('project', p.id, 'pjd-comments');
+}
+
+function openNewProject() {
+  document.getElementById('proj-modal-title').textContent = '프로젝트 추가';
+  document.getElementById('proj-modal-btn').textContent = '저장';
+  document.getElementById('pj-id').value = '';
+  ['pj-title','pj-start','pj-end','pj-members','pj-desc','pj-photo-url','pj-author'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('pj-status').value = '진행중';
+  updatePjPhotoPreview('');
+  openModal('proj-modal');
+}
+
+function openEditProject(p) {
+  document.getElementById('proj-modal-title').textContent = '프로젝트 수정';
+  document.getElementById('proj-modal-btn').textContent = '수정 저장';
+  document.getElementById('pj-id').value = p.id;
+  document.getElementById('pj-title').value = p.title || '';
+  document.getElementById('pj-start').value = p.start_date || '';
+  document.getElementById('pj-end').value = p.end_date || '';
+  document.getElementById('pj-status').value = p.status || '진행중';
+  document.getElementById('pj-members').value = (p.members || []).join(', ');
+  document.getElementById('pj-desc').value = p.description || '';
+  document.getElementById('pj-photo-url').value = p.photo_url || '';
+  document.getElementById('pj-author').value = p.author_name || '';
+  updatePjPhotoPreview(p.photo_url || '');
+  openModal('proj-modal');
+}
+
+async function saveProject() {
+  const title = document.getElementById('pj-title').value.trim();
+  if (!title) { toast('프로젝트 이름을 입력해주세요'); return; }
+  const members = document.getElementById('pj-members').value.split(',').map(s=>s.trim()).filter(Boolean);
+  const payload = {
+    title,
+    start_date:  document.getElementById('pj-start').value || null,
+    end_date:    document.getElementById('pj-end').value || null,
+    status:      document.getElementById('pj-status').value,
+    members,
+    description: document.getElementById('pj-desc').value.trim() || null,
+    photo_url:   document.getElementById('pj-photo-url').value.trim() || null,
+    author_name: document.getElementById('pj-author').value.trim() || null,
+  };
+  const editId = document.getElementById('pj-id').value;
+  let error;
+  if (editId) {
+    ({ error } = await sb.from('projects').update(payload).eq('id', editId));
+  } else {
+    ({ error } = await sb.from('projects').insert(payload));
+  }
+  if (error) { toast('오류: ' + (error.message||JSON.stringify(error))); console.error(error); return; }
+  closeModal('proj-modal');
+  toast(editId ? '프로젝트가 수정됐어요 ✏️' : '프로젝트가 추가됐어요 🎉');
+  loadProjects();
+}
+
+async function confirmDeleteProject() {
+  if (!deletingProjectId) return;
+  const { error } = await sb.from('projects').delete().eq('id', deletingProjectId);
+  if (error) { toast('오류: ' + (error.message||error)); return; }
+  closeModal('proj-confirm-modal');
+  closeModal('proj-detail-modal');
+  toast('프로젝트가 삭제됐어요');
+  deletingProjectId = null;
+  loadProjects();
 }
 
 // ── CALENDAR ──────────────────────────────────────────
