@@ -1306,6 +1306,9 @@ const MT_COLORS = [
   ['#FDF4E3','#8B6914'],['#F0EBF8','#6A3A9A']
 ];
 let deletingMeetingId = null;
+let meetingsData = [];      // 전체 캐시
+let meetingsPage = 0;       // 현재 페이지
+const MEETINGS_PER_PAGE = 12;
 
 function updateMtPhotoPreview(url) {
   const p = document.getElementById('mt-photo-preview');
@@ -1324,15 +1327,34 @@ function handleMtPhotoFile(input) {
   reader.readAsDataURL(file);
 }
 
-async function loadMeetings() {
+async function loadMeetings(reset = true) {
   const el = document.getElementById('meeting-list');
-  el.innerHTML = '<div class="loading">불러오는 중...</div>';
-  let q = sb.from('meetings').select('*').order('date', { ascending: false });
-  if (mFilter !== '전체') q = q.eq('type', mFilter);
-  const { data, error } = await q;
-  if (error || !data?.length) { el.innerHTML = '<div class="empty">아직 모임 기록이 없어요</div>'; return; }
+  if (reset) {
+    meetingsPage = 0;
+    el.innerHTML = '<div class="loading">불러오는 중...</div>';
+  }
 
-  el.innerHTML = `<div class="mt-grid">${data.map((m, i) => {
+  const from = meetingsPage * MEETINGS_PER_PAGE;
+  const to   = from + MEETINGS_PER_PAGE - 1;
+
+  let q = sb.from('meetings').select('*', { count: 'exact' })
+    .order('date', { ascending: false })
+    .range(from, to);
+  if (mFilter !== '전체') q = q.eq('type', mFilter);
+
+  const { data, error, count } = await q;
+  if (error) { el.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+  if (!data?.length && reset) { el.innerHTML = '<div class="empty">아직 모임 기록이 없어요</div>'; return; }
+
+  if (reset) {
+    meetingsData = data;
+    el.innerHTML = `<div class="mt-grid" id="mt-grid-inner"></div><div id="mt-load-more"></div>`;
+  } else {
+    meetingsData = [...meetingsData, ...data];
+  }
+
+  const grid = document.getElementById('mt-grid-inner');
+  grid.innerHTML = meetingsData.map((m, i) => {
     const [bg, fg] = MT_COLORS[i % MT_COLORS.length];
     const att = m.attendees || [];
     const thumbInner = m.photo_url
@@ -1342,16 +1364,41 @@ async function loadMeetings() {
            <div class="mt-thumb-title" style="color:${fg}">${m.title}</div>
            <div class="mt-thumb-date" style="color:${fg}">${fmtDate(m.date)}</div>
          </div>`;
-    return `<div class="mt-card" onclick='openMeetingDetail(${JSON.stringify(m).replace(/'/g,"&#39;")})'>
+    return `<div class="mt-card" onclick="openMeetingDetail('${m.id}')">
       <div class="mt-thumb">${thumbInner}</div>
       <div class="mt-card-label">${m.title}</div>
       <div class="mt-card-sub">${fmtDate(m.date)}</div>
       ${att.length ? `<div class="mt-card-sub" style="margin-top:2px;font-size:10px">${att.slice(0,4).join(', ')}${att.length>4?' 외 '+(att.length-4)+'명':''}</div>` : ''}
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
+
+  // 더 보기 버튼
+  const loadMore = document.getElementById('mt-load-more');
+  const loaded = meetingsData.length;
+  const total  = count || 0;
+  if (loaded < total) {
+    loadMore.innerHTML = `
+      <div style="text-align:center;margin-top:20px">
+        <button onclick="loadMoreMeetings()" style="padding:9px 28px;border-radius:20px;border:1px solid var(--border);background:none;cursor:pointer;font-size:13px;font-family:var(--font-sans);color:var(--text2);transition:all 0.15s"
+          onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='none'">
+          더 보기 (${loaded}/${total})
+        </button>
+      </div>`;
+  } else if (total > MEETINGS_PER_PAGE) {
+    loadMore.innerHTML = `<div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text3)">전체 ${total}개 모두 표시됐어요</div>`;
+  } else {
+    loadMore.innerHTML = '';
+  }
 }
 
-function openMeetingDetail(m) {
+async function loadMoreMeetings() {
+  meetingsPage++;
+  await loadMeetings(false);
+}
+
+function openMeetingDetail(id) {
+  const m = meetingsData.find(x => x.id === id);
+  if (!m) return;
   const att = m.attendees || [];
   const badgeClass = { '지정도서': 'b-green', '자유독서': 'b-blue', '번개': 'b-amber' }[m.type] || 'b-gray';
 
@@ -1377,6 +1424,7 @@ function openMeetingDetail(m) {
   document.getElementById('mtd-delete-btn').onclick = () => { deletingMeetingId = m.id; openModal('mt-confirm-modal'); };
 
   openModal('mt-detail-modal');
+  // 댓글은 모달 열릴 때만 로드 (지연 로딩)
   loadComments('meeting', m.id, 'mtd-comments');
 }
 
@@ -1412,7 +1460,7 @@ function mf(f, btn) {
   mFilter = f;
   document.querySelectorAll('#page-meetings .fb').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  loadMeetings();
+  loadMeetings(true);
 }
 
 async function saveMeeting() {
@@ -1515,29 +1563,54 @@ function handleCoverFile(input) {
   reader.readAsDataURL(file);
 }
 
-async function loadReviews() {
+let reviewsAllData = []; // 필터 구성용 전체 캐시
+let reviewsPage = 0;
+const REVIEWS_PER_PAGE = 16;
+
+async function loadReviews(reset = true) {
   const el = document.getElementById('review-list');
-  el.innerHTML = '<div class="loading">불러오는 중...</div>';
-
-  const { data, error } = await sb.from('reviews').select('*').order('created_at', { ascending: false });
-  if (error || !data?.length) {
-    el.innerHTML = '<div class="empty">아직 독후감이 없어요</div>';
-    buildFilters([]);
-    return;
+  if (reset) {
+    reviewsPage = 0;
+    el.innerHTML = '<div class="loading">불러오는 중...</div>';
   }
 
-  buildFilters(data);
-
-  const filtered = rFilter === '전체' ? data : data.filter(r =>
-    rFilterMode === 'writer' ? r.writer === rFilter : r.type === rFilter
-  );
-  if (!filtered.length) {
-    el.innerHTML = '<div class="empty">해당 회원의 독후감이 없어요</div>';
-    return;
+  // 필터 구성용 전체 목록 (writer/genre만 - 첫 로드 또는 reset 시)
+  if (reset) {
+    const { data: allData } = await sb.from('reviews')
+      .select('id,writer,type').order('created_at', { ascending: false });
+    reviewsAllData = allData || [];
+    buildFilters(reviewsAllData);
   }
 
-  // 뼈대 그리드 먼저 렌더
-  el.innerHTML = `<div class="rv-grid">${filtered.map((r, i) => {
+  // 실제 페이지 데이터
+  const from = reviewsPage * REVIEWS_PER_PAGE;
+  const to   = from + REVIEWS_PER_PAGE - 1;
+
+  let q = sb.from('reviews').select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(from, to);
+  if (rFilter !== '전체') {
+    if (rFilterMode === 'writer') q = q.eq('writer', rFilter);
+    else q = q.eq('type', rFilter);
+  }
+
+  const { data, error, count } = await q;
+  if (error) { el.innerHTML = '<div class="empty">불러오기 실패</div>'; return; }
+  if (!data?.length && reset) {
+    el.innerHTML = '<div class="empty">해당 독후감이 없어요</div>'; return;
+  }
+
+  const newItems = data || [];
+
+  if (reset) {
+    el.innerHTML = `<div class="rv-grid" id="rv-grid-inner"></div><div id="rv-load-more"></div>`;
+    el._allItems = newItems;
+  } else {
+    el._allItems = [...(el._allItems || []), ...newItems];
+  }
+
+  const grid = document.getElementById('rv-grid-inner');
+  grid.innerHTML = (el._allItems || []).map((r, i) => {
     const [bg, fg] = COVER_COLORS[i % COVER_COLORS.length];
     const coverHtml = r.cover_url
       ? `<img src="${r.cover_url}" alt="${r.book}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'">`
@@ -1547,10 +1620,10 @@ async function loadReviews() {
       <div class="rv-card-title">${r.book}</div>
       <div class="rv-card-writer">${r.writer}</div>
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
 
-  // cover_url 없는 것만 Open Library에서 비동기 검색
-  filtered.forEach(async (r, i) => {
+  // 표지 자동 검색 (cover_url 없는 것만)
+  newItems.forEach(async (r) => {
     if (r.cover_url) return;
     const url = await fetchCover(r.book, r.book_author);
     if (url) {
@@ -1558,6 +1631,31 @@ async function loadReviews() {
       if (inner) inner.outerHTML = `<img src="${url}" alt="${r.book}" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display='none'">`;
     }
   });
+
+  // 더 보기 버튼
+  const loadMore = document.getElementById('rv-load-more');
+  const loaded = (el._allItems || []).length;
+  const total  = count || 0;
+  if (loadMore) {
+    if (loaded < total) {
+      loadMore.innerHTML = `
+        <div style="text-align:center;margin-top:20px">
+          <button onclick="loadMoreReviews()" style="padding:9px 28px;border-radius:20px;border:1px solid var(--border);background:none;cursor:pointer;font-size:13px;font-family:var(--font-sans);color:var(--text2)"
+            onmouseover="this.style.background='var(--bg2)'" onmouseout="this.style.background='none'">
+            더 보기 (${loaded}/${total})
+          </button>
+        </div>`;
+    } else if (total > REVIEWS_PER_PAGE) {
+      loadMore.innerHTML = `<div style="text-align:center;margin-top:16px;font-size:12px;color:var(--text3)">전체 ${total}개 모두 표시됐어요</div>`;
+    } else {
+      loadMore.innerHTML = '';
+    }
+  }
+}
+
+async function loadMoreReviews() {
+  reviewsPage++;
+  await loadReviews(false);
 }
 
 function setFilterMode(mode, btn) {
@@ -1565,10 +1663,7 @@ function setFilterMode(mode, btn) {
   rFilter = '전체';
   document.querySelectorAll('#page-reviews .fb[id^="mode-"]').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  // rebuild filters with current data
-  const allCards = document.querySelectorAll('.rv-book-card');
-  // re-fetch to rebuild filters
-  loadReviews();
+  loadReviews(true);
 }
 
 function buildFilters(data) {
@@ -1593,7 +1688,7 @@ function rf(f, btn) {
   rFilter = f;
   document.querySelectorAll('#review-filters .fb').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  loadReviews();
+  loadReviews(true);
 }
 
 async function openDetail(r) {
